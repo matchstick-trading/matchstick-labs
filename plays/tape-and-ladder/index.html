@@ -1,0 +1,615 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
+<title>Tape &amp; Ladder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0a0f0c;
+    --panel:#0d1611;
+    --rule:#1c2e22;
+    --phosphor:#6ef2a0;
+    --phosphor-dim:#2c5b3f;
+    --down:#ff6b5c;
+    --down-dim:#5c3129;
+    --paper:#d8f5e2;
+    --muted:#7fa38c;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--void);
+    color:var(--paper);
+    font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    min-height:100vh;
+    padding:28px 20px 40px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:22px;
+  }
+  .wrap{width:100%;max-width:1040px;display:flex;flex-direction:column;gap:18px;}
+
+  header{display:flex;flex-direction:column;gap:6px;}
+  h1{
+    font-family:"VT323",monospace;
+    font-size:clamp(2.4rem,6vw,3.4rem);
+    letter-spacing:.02em;
+    color:var(--phosphor);
+    text-shadow:0 0 18px rgba(110,242,160,.35);
+    margin:0;
+    line-height:1;
+    text-wrap:balance;
+  }
+  .thesis{
+    color:var(--muted);
+    font-size:.95rem;
+    max-width:62ch;
+    line-height:1.5;
+  }
+  .thesis em{color:var(--paper);font-style:normal;}
+
+  .toolbar{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:14px;
+    padding:10px 14px;
+    background:var(--panel);
+    border:1px solid var(--rule);
+  }
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    font-size:.78rem;
+    color:var(--muted);
+    letter-spacing:.02em;
+  }
+  .legend b{color:var(--paper);font-weight:600;}
+  .legend kbd{
+    display:inline-block;
+    padding:1px 6px;
+    border:1px solid var(--phosphor-dim);
+    border-radius:2px;
+    color:var(--phosphor);
+    font-size:.72rem;
+    background:rgba(110,242,160,.06);
+  }
+  button{
+    margin-left:auto;
+    font-family:inherit;
+    font-size:.8rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--void);
+    background:var(--phosphor);
+    border:none;
+    padding:8px 14px;
+    cursor:pointer;
+  }
+  button:hover{background:var(--paper);}
+  button:focus-visible, a:focus-visible{outline:2px solid var(--phosphor);outline-offset:2px;}
+  button.ghost{
+    margin-left:8px;
+    background:transparent;
+    color:var(--phosphor);
+    border:1px solid var(--phosphor-dim);
+    min-width:8.5em;
+  }
+  button.ghost:hover{background:rgba(110,242,160,.08);color:var(--paper);}
+  button.ghost[aria-pressed="false"]{color:var(--muted);border-color:var(--rule);}
+
+  .panels{
+    display:grid;
+    grid-template-columns:1.7fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:760px){ .panels{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--rule);
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .panel h2{
+    font-family:"VT323",monospace;
+    font-size:1.3rem;
+    letter-spacing:.06em;
+    color:var(--muted);
+    margin:0;
+    padding:10px 14px 8px;
+    border-bottom:1px solid var(--rule);
+  }
+  .panel h2 span{color:var(--phosphor);}
+  .canvas-shell{
+    position:relative;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, transparent 1px, transparent 3px);
+  }
+  canvas{display:block;width:100%;height:auto;}
+  .hud{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    padding:9px 14px;
+    border-top:1px solid var(--rule);
+    font-size:.82rem;
+    font-variant-numeric:tabular-nums;
+    color:var(--paper);
+  }
+  .hud .tag{color:var(--muted);letter-spacing:.08em;font-size:.7rem;}
+  .hud .up{color:var(--phosphor);}
+  .hud .down{color:var(--down);}
+
+  footer{
+    max-width:1040px;
+    width:100%;
+    color:var(--muted);
+    font-size:.78rem;
+    line-height:1.6;
+    border-top:1px solid var(--rule);
+    padding-top:14px;
+  }
+  footer code{color:var(--phosphor);}
+
+  @media (prefers-reduced-motion:no-preference){
+    .panel{animation:flicker 6s infinite;}
+  }
+  @keyframes flicker{
+    0%,96%,100%{filter:brightness(1);}
+    97%{filter:brightness(1.04);}
+    98%{filter:brightness(.98);}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>TAPE &amp; LADDER</h1>
+    <p class="thesis">Everything below is a number. <em>If you can see it, you can stand on it</em> &mdash; the price tape as terrain to run and jump, the order book as a wall of ledges to climb. No charts, no 3D, just glyphs mapped from data, same trick as the ASCII heightmap game this borrows from.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="legend">
+      <span><b>Terrain</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd> run &middot; <kbd>&uarr;</kbd> jump</span>
+      <span><b>Ladder</b> <kbd>W</kbd> climb up &middot; <kbd>S</kbd> climb down</span>
+    </div>
+    <button id="regen" type="button">New session &middot; R</button>
+    <button id="soundToggle" class="ghost" type="button" aria-pressed="true">Sound &middot; ON</button>
+  </div>
+
+  <div class="panels">
+    <section class="panel">
+      <h2>TERRAIN &mdash; <span>the tape you run</span></h2>
+      <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="360" aria-label="Candle terrain runner"></canvas></div>
+      <div class="hud">
+        <span><span class="tag">BAR</span> <span id="tBar">&mdash;</span></span>
+        <span id="tOhlc"><span class="tag">O/H/L/C</span> &mdash;</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>THE LADDER &mdash; <span>the book you climb</span></h2>
+      <div class="canvas-shell"><canvas id="ladderCanvas" width="360" height="360" aria-label="Order book climbing wall"></canvas></div>
+      <div class="hud">
+        <span class="tag">STANDING ON</span>
+        <span id="lLevel">&mdash;</span>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    An early sketch exploring one question: what's the smallest interaction that proves a spatial
+    way of browsing market data? Left panel maps <code>max(open,close)</code> per bar to a walkable
+    ledge, the wick above it to a thin non-solid spike. Right panel maps order size to ledge width;
+    climbing crosses the spread. Synthetic data, regenerates each run &mdash; not wired to any real
+    session or trading system.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function rand(){ return Math.random(); }
+  function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  // -------------------------------------------------------------- SOUND FX
+  var SoundFX = (function(){
+    var enabled = true;
+    try {
+      var stored = localStorage.getItem("tapeAndLadderSound");
+      if (stored !== null) enabled = stored === "1";
+    } catch(e){}
+
+    var ctx = null;
+    function getCtx(){
+      if (!ctx){
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+
+    function tone(freq, dur, opts){
+      if (!enabled) return;
+      var c = getCtx();
+      if (!c) return;
+      opts = opts || {};
+      var t0 = c.currentTime;
+      var osc = c.createOscillator();
+      var gain = c.createGain();
+      osc.type = opts.type || "square";
+      osc.frequency.setValueAtTime(freq, t0);
+      if (opts.slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1,opts.slideTo), t0+dur);
+      var peak = opts.gain != null ? opts.gain : 0.14;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(peak, t0 + Math.min(0.012, dur*0.3));
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gain); gain.connect(c.destination);
+      osc.start(t0); osc.stop(t0+dur+0.02);
+    }
+
+    function noiseBurst(dur, opts){
+      if (!enabled) return;
+      var c = getCtx();
+      if (!c) return;
+      opts = opts || {};
+      var t0 = c.currentTime;
+      var bufSize = Math.max(1, Math.floor(c.sampleRate*dur));
+      var buf = c.createBuffer(1, bufSize, c.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var i=0;i<bufSize;i++) data[i] = (Math.random()*2-1) * Math.pow(1 - i/bufSize, 2);
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      var filt = c.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = opts.cutoff || 900;
+      var gain = c.createGain();
+      var peak = opts.gain != null ? opts.gain : 0.2;
+      gain.gain.setValueAtTime(peak, t0);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+      src.connect(filt); filt.connect(gain); gain.connect(c.destination);
+      src.start(t0); src.stop(t0+dur+0.02);
+    }
+
+    return {
+      isEnabled: function(){ return enabled; },
+      setEnabled: function(v){
+        enabled = v;
+        try { localStorage.setItem("tapeAndLadderSound", v ? "1" : "0"); } catch(e){}
+      },
+      jump: function(){ tone(520, 0.09, {type:"square", slideTo:780, gain:0.11}); },
+      land: function(){ noiseBurst(0.08, {cutoff:220, gain:0.18}); },
+      climbStep: function(){ tone(920, 0.045, {type:"triangle", gain:0.08}); },
+      bump: function(){ noiseBurst(0.07, {cutoff:140, gain:0.16}); tone(90, 0.09, {type:"sawtooth", gain:0.08}); },
+      spreadCross: function(){
+        if (!enabled) return;
+        var notes = [660, 880, 1320];
+        var t = 0;
+        for (var i=0;i<notes.length;i++){
+          (function(freq, delay){
+            setTimeout(function(){ tone(freq, 0.14, {type:"square", gain:0.13}); }, delay);
+          })(notes[i], t);
+          t += 70;
+        }
+      }
+    };
+  })();
+
+  var soundBtn = document.getElementById("soundToggle");
+  function refreshSoundBtn(){
+    var on = SoundFX.isEnabled();
+    soundBtn.textContent = "Sound · " + (on ? "ON" : "OFF");
+    soundBtn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  refreshSoundBtn();
+  soundBtn.addEventListener("click", function(){
+    SoundFX.setEnabled(!SoundFX.isEnabled());
+    refreshSoundBtn();
+  });
+
+  // ---------------------------------------------------------------- TERRAIN
+  var tCanvas = document.getElementById("terrainCanvas");
+  var tSurf = setupCanvas(tCanvas);
+  var tBarEl = document.getElementById("tBar");
+  var tOhlcEl = document.getElementById("tOhlc");
+
+  function setupCanvas(cv){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var cssW = cv.width, cssH = cv.height;
+    cv.style.width = cssW + "px";
+    cv.style.height = cssH + "px";
+    cv.width = Math.round(cssW * dpr);
+    cv.height = Math.round(cssH * dpr);
+    var ctx = cv.getContext("2d");
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {ctx:ctx, w:cssW, h:cssH};
+  }
+
+  var COLW = 24, N_BARS = 420, MAXH = 230, BASE_MARGIN = 26;
+  var GRAVITY = 1500, JUMP_V = -580, MOVE_SPEED = 210;
+  var PLAYER_W = 12, PLAYER_H = 18;
+
+  var bars, player, keysHeld = {}, jumpQueued = false, wasBlocked = false;
+  var basePrice = 100 + Math.floor(rand()*40);
+
+  function genBars(){
+    bars = [];
+    var level = 0.5;
+    for (var i=0;i<N_BARS;i++){
+      var open = level;
+      var step = (rand()-0.5)*0.085;
+      if (rand() < 0.07) step += (rand()-0.5)*0.28;
+      level = clamp(level + step, 0.06, 0.94);
+      var close = level;
+      var top = Math.max(open, close);
+      var bottom = Math.min(open, close);
+      var wickHi = Math.min(0.99, top + rand()*0.055);
+      var wickLo = Math.max(0.01, bottom - rand()*0.05);
+      bars.push({open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo, bull: close>=open});
+    }
+  }
+
+  function groundY(i){
+    i = clamp(i,0,N_BARS-1);
+    return tSurf.h - BASE_MARGIN - bars[i].top*MAXH;
+  }
+
+  function resetTerrain(){
+    genBars();
+    player = { x: COLW*1.5, y: groundY(1)-PLAYER_H, vx:0, vy:0, onGround:true };
+    wasBlocked = false;
+  }
+
+  function terrainIndexAt(worldX){ return clamp(Math.floor(worldX/COLW), 0, N_BARS-1); }
+
+  function updateTerrain(dt){
+    var wasOnGround = player.onGround;
+    var left = keysHeld["ArrowLeft"];
+    var right = keysHeld["ArrowRight"];
+    player.vx = 0;
+    if (left && !right) player.vx = -MOVE_SPEED;
+    if (right && !left) player.vx = MOVE_SPEED;
+
+    if (jumpQueued && player.onGround){
+      player.vy = JUMP_V;
+      player.onGround = false;
+      SoundFX.jump();
+    }
+    jumpQueued = false;
+
+    player.vy += GRAVITY*dt;
+
+    var proposedX = clamp(player.x + player.vx*dt, COLW*0.5, (N_BARS-1)*COLW - COLW*0.5);
+    var curFeet = player.y + PLAYER_H;
+    var targetIdx = terrainIndexAt(proposedX);
+    var targetGround = groundY(targetIdx);
+
+    // block horizontal motion into a cliff face taller than the player can currently clear
+    var STEP_TOLERANCE = 46;
+    if (targetGround < curFeet - STEP_TOLERANCE) {
+      // wall ahead: only allow if already rising above it
+      if (player.vx !== 0 && !wasBlocked) SoundFX.bump();
+      wasBlocked = true;
+    } else {
+      player.x = proposedX;
+      wasBlocked = false;
+    }
+
+    player.y += player.vy*dt;
+
+    var idx = terrainIndexAt(player.x);
+    var gY = groundY(idx);
+    if (player.y + PLAYER_H >= gY && player.vy >= 0){
+      player.y = gY - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      if (!wasOnGround) SoundFX.land();
+    } else {
+      player.onGround = false;
+    }
+
+    var cam = clamp(player.x - tSurf.w/2, 0, Math.max(0,(N_BARS-1)*COLW - tSurf.w));
+    return {idx:idx, cam:cam};
+  }
+
+  function drawTerrain(cam, idx){
+    var ctx = tSurf.ctx, w=tSurf.w, h=tSurf.h;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = "#0d1611";
+    ctx.fillRect(0,0,w,h);
+
+    ctx.strokeStyle = "rgba(110,242,160,.05)";
+    ctx.lineWidth = 1;
+    for (var gx=0; gx<w; gx+=40){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
+
+    var baseline = h - BASE_MARGIN;
+    ctx.strokeStyle = "#2c5b3f";
+    ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
+
+    var startI = Math.max(0, Math.floor(cam/COLW)-1);
+    var endI = Math.min(N_BARS-1, Math.ceil((cam+w)/COLW)+1);
+    for (var i=startI;i<=endI;i++){
+      var b = bars[i];
+      var sx = i*COLW - cam;
+      var topY = h - BASE_MARGIN - b.top*MAXH;
+      var botY = h - BASE_MARGIN - b.bottom*MAXH;
+      var wHiY = h - BASE_MARGIN - b.wickHi*MAXH;
+      var wLoY = h - BASE_MARGIN - b.wickLo*MAXH;
+      var col = b.bull ? "#6ef2a0" : "#ff6b5c";
+
+      ctx.strokeStyle = col;
+      ctx.globalAlpha = .55;
+      ctx.beginPath();
+      ctx.moveTo(sx+COLW/2, wHiY);
+      ctx.lineTo(sx+COLW/2, wLoY);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = col;
+      ctx.fillRect(sx+3, topY, COLW-6, Math.max(2, botY-topY));
+      ctx.fillRect(sx+3, botY, COLW-6, Math.max(1, baseline-botY));
+      ctx.globalAlpha = i===idx ? 1 : .38;
+      ctx.fillStyle = "#0d1611";
+      ctx.fillRect(sx+3, topY, COLW-6, 2);
+      ctx.globalAlpha = 1;
+    }
+
+    var px = player.x - cam - PLAYER_W/2;
+    ctx.shadowColor = "#6ef2a0";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#d8f5e2";
+    ctx.fillRect(px, player.y, PLAYER_W, PLAYER_H);
+    ctx.shadowBlur = 0;
+  }
+
+  function fmtPrice(v){ return (basePrice + v*46).toFixed(2); }
+
+  function updateTerrainHud(idx){
+    var b = bars[idx];
+    tBarEl.textContent = idx + " / " + (N_BARS-1);
+    var cls = b.bull ? "up" : "down";
+    tOhlcEl.innerHTML = '<span class="tag">O/H/L/C</span> ' +
+      fmtPrice(b.open) + ' / ' + fmtPrice(b.wickHi) + ' / ' + fmtPrice(b.wickLo) + ' / ' +
+      '<span class="'+cls+'">' + fmtPrice(b.close) + (b.bull? ' &#9650;':' &#9660;') + '</span>';
+  }
+
+  // ----------------------------------------------------------------- LADDER
+  var lCanvas = document.getElementById("ladderCanvas");
+  var lSurf = setupCanvas(lCanvas);
+  var lLevelEl = document.getElementById("lLevel");
+
+  var BID_N = 8, ASK_N = 8, TOTAL = BID_N+ASK_N;
+  var levels, ladderPlayer;
+
+  function genLevels(){
+    levels = [];
+    var tick = 0.08;
+    for (var i=0;i<BID_N;i++){
+      var size = 4 + Math.floor(rand()*22);
+      if (rand()<0.18) size += 40;
+      levels.push({ side:"bid", size:size, price: basePrice - tick*(BID_N-i) });
+    }
+    for (var j=0;j<ASK_N;j++){
+      var size2 = 4 + Math.floor(rand()*22);
+      if (rand()<0.18) size2 += 40;
+      levels.push({ side:"ask", size:size2, price: basePrice + tick*(j+1) });
+    }
+    ladderPlayer = { idx: BID_N-1 };
+  }
+
+  function ladderRowY(rowIndex){
+    var rows = TOTAL;
+    var gapExtra = 14;
+    var usable = lSurf.h - 20;
+    var rowH = (usable - gapExtra) / rows;
+    var y = lSurf.h - 10 - (rowIndex+1)*rowH;
+    if (rowIndex >= BID_N) y -= gapExtra;
+    return {y:y, h:rowH};
+  }
+
+  function drawLadder(){
+    var ctx = lSurf.ctx, w=lSurf.w, h=lSurf.h;
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = "#0d1611";
+    ctx.fillRect(0,0,w,h);
+
+    var maxSize = 0;
+    for (var k=0;k<levels.length;k++) maxSize = Math.max(maxSize, levels[k].size);
+
+    for (var i=0;i<levels.length;i++){
+      var lv = levels[i];
+      var row = ladderRowY(i);
+      var barW = 30 + (w-90) * (lv.size/maxSize);
+      var x = (w-barW)/2;
+      var col = lv.side==="bid" ? "#6ef2a0" : "#ff6b5c";
+
+      ctx.globalAlpha = i===ladderPlayer.idx ? 1 : .68;
+      ctx.fillStyle = col;
+      ctx.fillRect(x, row.y+3, barW, row.h-6);
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = "#0a0f0c";
+      ctx.font = "11px 'IBM Plex Mono', monospace";
+      ctx.textBaseline = "middle";
+      ctx.fillText(lv.size, x+8, row.y+row.h/2);
+
+      ctx.fillStyle = "#7fa38c";
+      ctx.textAlign = "right";
+      ctx.fillText(lv.price.toFixed(2), w-8, row.y+row.h/2);
+      ctx.textAlign = "left";
+    }
+
+    var mid = (ladderRowY(BID_N-1).y + ladderRowY(BID_N).y + ladderRowY(BID_N).h) / 2;
+    ctx.strokeStyle = "#2c5b3f";
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#7fa38c";
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    ctx.fillText("SPREAD", 8, mid-8);
+
+    var pr = ladderRowY(ladderPlayer.idx);
+    ctx.shadowColor = "#d8f5e2";
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = "#d8f5e2";
+    ctx.fillRect(w/2-6, pr.y+pr.h/2-6, 12, 12);
+    ctx.shadowBlur = 0;
+  }
+
+  function updateLadderHud(){
+    var lv = levels[ladderPlayer.idx];
+    var cls = lv.side==="bid" ? "up" : "down";
+    lLevelEl.innerHTML = '<span class="'+cls+'">' + lv.side.toUpperCase() + '</span> $' + lv.price.toFixed(2) + ' &times; ' + lv.size;
+  }
+
+  function crossedSpread(a, b){
+    var loSide = Math.min(a,b), hiSide = Math.max(a,b);
+    return loSide <= BID_N-1 && hiSide >= BID_N;
+  }
+
+  function handleLadderMove(prevIdx, newIdx){
+    if (crossedSpread(prevIdx, newIdx)) SoundFX.spreadCross();
+    else SoundFX.climbStep();
+  }
+
+  // ------------------------------------------------------------------ LOOP
+  function resetAll(){
+    resetTerrain();
+    genLevels();
+  }
+  resetAll();
+
+  window.addEventListener("keydown", function(e){
+    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].indexOf(e.key)!==-1) e.preventDefault();
+    keysHeld[e.key] = true;
+    if (e.repeat) return;
+    if (e.key==="ArrowUp") jumpQueued = true;
+    var prevLadderIdx = ladderPlayer.idx;
+    if (e.key==="w" || e.key==="W") ladderPlayer.idx = clamp(ladderPlayer.idx+1, 0, TOTAL-1);
+    if (e.key==="s" || e.key==="S") ladderPlayer.idx = clamp(ladderPlayer.idx-1, 0, TOTAL-1);
+    if (ladderPlayer.idx !== prevLadderIdx) handleLadderMove(prevLadderIdx, ladderPlayer.idx);
+    if (e.key==="r" || e.key==="R") resetAll();
+  }, {passive:false});
+  window.addEventListener("keyup", function(e){ keysHeld[e.key]=false; });
+  document.getElementById("regen").addEventListener("click", resetAll);
+
+  var last = performance.now();
+  function frame(now){
+    var dt = Math.min(0.033, (now-last)/1000);
+    last = now;
+    var t = updateTerrain(dt);
+    drawTerrain(t.cam, t.idx);
+    updateTerrainHud(t.idx);
+    drawLadder();
+    updateLadderHud();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
