@@ -494,7 +494,6 @@
   var placementStep = "stop";   // "stop" | "limit"
   var stopIdx = null, limitIdx = null, stopTicks = null, limitTicks = null;
   var pnlTicks = 0;
-  var currentSeed = 0;
   var banner = null;            // {text, color, until}
   var helpOpen = false;
 
@@ -522,7 +521,17 @@
     return {ctx:ctx, w:cssW, h:cssH};
   }
 
-  var COLW = 24, N_BARS = 420, MAXH = 230, BASE_MARGIN = 26;
+  var COLW = 24, MAXH = 230, BASE_MARGIN = 26;
+  // M2 streaming terrain: bar-index space is unbounded (no more fixed N_BARS array —
+  // "no more end of the world"). GEN_AHEAD_BARS is how far past the camera's leading
+  // edge stays generated; DROP_MARGIN_BARS is the small trailing buffer kept behind
+  // the camera before bars are dropped (must cover drawTerrain's own -1 lookback).
+  var GEN_AHEAD_BARS = 60, DROP_MARGIN_BARS = 2;
+  // Periodic coordinate rebase so cam/player.x (and the bar-index counters that track
+  // them) don't grow unbounded over a long session. The shift is chosen as an exact
+  // multiple of COLW so every world-space pixel position (i*COLW - cam) comes out
+  // bit-for-bit identical before and after — no jump/flicker on the rebase frame.
+  var REBASE_BAR_SHIFT = Math.round(100000/COLW), REBASE_SHIFT_PX = REBASE_BAR_SHIFT*COLW;
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
   // canvas, instead of the player moving through a fixed world. `scrollSpeed` is a
@@ -538,7 +547,13 @@
   // near-miss jump still reads as cleared — the physics arc itself is untouched.
   var HIT_INSET_X = 3, HIT_INSET_TOP = 6;
 
-  var bars = null, player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
+  // M2 streaming terrain state. `bars` is now a dense sliding window (never the
+  // whole world, never null) — `barsBaseIndex` is the absolute bar-index of
+  // bars[0], `barsGenIndex` the absolute index of the next bar to generate.
+  // `barLevel`/`lastObstacleAbsI` are the generator's persistent carry-state,
+  // continuous across round transitions (see ensureBarsGenerated()).
+  var bars = [], barsBaseIndex = 0, barsGenIndex = 0, barLevel = 0.5, lastObstacleAbsI = -999;
+  var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
   var basePrice = 100 + Math.floor(rand()*40);
   var lastCam = 0, lastIdx = 0;
   // World-space scroll offset. Now advances on its own every frame (auto-scroll)
@@ -552,48 +567,108 @@
     return Math.max(0.028, 0.05 - 0.0015*(round-1));
   }
 
-  function genBars(){
-    bars = [];
-    var level = 0.5;
+  // Generates one bar at absolute index `barsGenIndex`, appends it to the window,
+  // and advances the generator's persistent carry-state (barLevel, obstacle spacing).
+  // Same per-bar math as the old one-shot genBars() loop body — only the framing
+  // changed, from "build all 420 up front" to "append one more as needed".
+  function genNextBar(threshold){
+    var open = barLevel;
+    var step = (rand()-0.5)*0.085;
+    if (rand() < 0.07) step += (rand()-0.5)*0.28;
+    barLevel = clamp(barLevel + step, 0.06, 0.94);
+    var close = barLevel;
+    var top = Math.max(open, close);
+    var bottom = Math.min(open, close);
+    var wickHi = Math.min(0.99, top + rand()*0.055);
+    var wickLo = Math.max(0.01, bottom - rand()*0.05);
+    var bull = close >= open;
+    var bodyMag = top - bottom;
+    var favorable = (direction === "LONG") ? bull : !bull;
+    var isObstacle = !favorable && bodyMag >= threshold;
+    if (isObstacle){
+      if (barsGenIndex - lastObstacleAbsI < MIN_OBSTACLE_GAP_COLS) isObstacle = false;
+      else lastObstacleAbsI = barsGenIndex;
+    }
+    var hurdlePx = isObstacle ? clamp(bodyMag*MAXH, 18, 85) : 0;
+    bars.push({
+      open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo,
+      bull:bull, favorable:favorable, isObstacle:isObstacle, hurdlePx:hurdlePx,
+      sampled: (barsGenIndex % 3 === 0), resolved:false
+    });
+    barsGenIndex++;
+  }
+
+  // Keeps ~GEN_AHEAD_BARS generated past the camera's leading (right) edge. Runs
+  // every frame regardless of round phase — M2 makes generation continuous and
+  // independent of round win/lose bookkeeping (see commit message for the
+  // round-lifecycle-vs-continuous-generation judgment call).
+  function ensureBarsGenerated(){
+    var leadingIdx = Math.floor((cam + tSurf.w) / COLW);
+    var targetGenIndex = leadingIdx + GEN_AHEAD_BARS;
     var threshold = obstacleThreshold();
-    var lastObstacleI = -999;
-    for (var i=0;i<N_BARS;i++){
-      var open = level;
-      var step = (rand()-0.5)*0.085;
-      if (rand() < 0.07) step += (rand()-0.5)*0.28;
-      level = clamp(level + step, 0.06, 0.94);
-      var close = level;
-      var top = Math.max(open, close);
-      var bottom = Math.min(open, close);
-      var wickHi = Math.min(0.99, top + rand()*0.055);
-      var wickLo = Math.max(0.01, bottom - rand()*0.05);
-      var bull = close >= open;
-      var bodyMag = top - bottom;
-      var favorable = (direction === "LONG") ? bull : !bull;
-      var isObstacle = !favorable && bodyMag >= threshold;
-      if (isObstacle){
-        if (i - lastObstacleI < MIN_OBSTACLE_GAP_COLS) isObstacle = false;
-        else lastObstacleI = i;
-      }
-      var hurdlePx = isObstacle ? clamp(bodyMag*MAXH, 18, 85) : 0;
-      bars.push({
-        open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo,
-        bull:bull, favorable:favorable, isObstacle:isObstacle, hurdlePx:hurdlePx,
-        sampled: (i % 3 === 0), resolved:false
-      });
+    while (barsGenIndex < targetGenIndex){
+      genNextBar(threshold);
+    }
+  }
+
+  // Drops bars once they've scrolled well behind the camera, keeping the live
+  // window bounded in size no matter how long the run goes. DROP_MARGIN_BARS
+  // covers drawTerrain's own -1 lookback so nothing still on-screen gets dropped.
+  function dropOldBars(){
+    var keepFromIdx = Math.floor(cam/COLW) - DROP_MARGIN_BARS;
+    while (bars.length > 0 && barsBaseIndex < keepFromIdx){
+      bars.shift();
+      barsBaseIndex++;
+    }
+  }
+
+  // Maps an absolute bar-index to its live bar object, or null if it's outside the
+  // currently-generated/kept window (already dropped, or not generated yet).
+  function barAt(absIndex){
+    var rel = absIndex - barsBaseIndex;
+    if (rel < 0 || rel >= bars.length) return null;
+    return bars[rel];
+  }
+
+  // Periodic coordinate rebase (M2): once cam crosses REBASE_SHIFT_PX, subtract the
+  // same COLW-aligned amount from every world-space coordinate/index counter in one
+  // frame, so nothing keeps growing unbounded across a long session. Because the
+  // shift is identical everywhere and exactly a multiple of COLW, every rendered
+  // pixel position (i*COLW - cam, player.x - cam) comes out bit-for-bit unchanged —
+  // this is a bookkeeping reset only, not a visible one.
+  function maybeRebaseWorld(){
+    while (cam >= REBASE_SHIFT_PX){
+      cam -= REBASE_SHIFT_PX;
+      player.x -= REBASE_SHIFT_PX;
+      barsBaseIndex -= REBASE_BAR_SHIFT;
+      barsGenIndex -= REBASE_BAR_SHIFT;
+      lastObstacleAbsI -= REBASE_BAR_SHIFT;
     }
   }
 
   function baselineY(){ return tSurf.h - BASE_MARGIN; }
-  function terrainIndexAt(worldX){ return clamp(Math.floor(worldX/COLW), 0, N_BARS-1); }
+  // No more upper clamp — bar-index space is unbounded now ("no more end of the
+  // world"). Still floored at 0: world-space never goes negative.
+  function terrainIndexAt(worldX){ return Math.max(0, Math.floor(worldX/COLW)); }
 
-  function resetTerrainPlayer(){
-    // Player world-x starts level with cam=0, at a screen position one third across
-    // the canvas — cam and player.x then advance together every frame at the same
-    // scrollSpeed, so the player's on-screen position stays fixed while the world
-    // (and every existing world-space index/hitbox calc below) scrolls underneath it.
+  // One-time world-space init. Unlike M1, this is NOT re-run on every round — M2
+  // makes the tape/camera scroll continuously across round boundaries, so cam and
+  // player.x must persist through round transitions instead of snapping back to 0
+  // (that snap would itself be the "jump/flicker" the rebase is designed to avoid).
+  // Only the per-round *vertical* physics state resets; see resetTerrainPlayerVerticals().
+  function initTerrainPlayer(){
     cam = 0;
     player = { x: tSurf.w/3, y: baselineY()-PLAYER_H, vx:scrollSpeed, vy:0, onGround:true };
+  }
+
+  // Per-round reset: grounds the player and clears jump/vertical state only. Does
+  // NOT touch cam/player.x — those are continuous now (see initTerrainPlayer above).
+  function resetTerrainPlayerVerticals(){
+    if (!player){ initTerrainPlayer(); return; }
+    player.y = baselineY()-PLAYER_H;
+    player.vy = 0;
+    player.onGround = true;
+    jumpHoldMs = 0;
   }
 
   function updateTerrain(dt){
@@ -622,10 +697,11 @@
 
     // Auto-scroll: no directional input drives this anymore — player.x and cam both
     // advance at scrollSpeed every frame, world-scrolling past a screen-fixed player.
+    // No more upper-bound clamp (M2 removes the fixed-world boundary); the lower
+    // bound is kept only as a defensive floor, since scrollSpeed never goes negative.
     player.vx = scrollSpeed;
-    var maxX = (N_BARS-1)*COLW - COLW*0.5;
-    player.x = clamp(player.x + player.vx*dt, COLW*0.5, maxX);
-    cam = clamp(cam + scrollSpeed*dt, 0, Math.max(0,(N_BARS-1)*COLW - tSurf.w));
+    player.x = Math.max(COLW*0.5, player.x + player.vx*dt);
+    cam = Math.max(0, cam + scrollSpeed*dt);
     player.y += player.vy*dt;
 
     var baseline = baselineY();
@@ -637,6 +713,14 @@
     } else {
       player.onGround = false;
     }
+
+    // M2 streaming terrain: rebase first (so generation/dropping below operate on
+    // already-rebased coordinates), then keep the window filled ahead of the camera
+    // and drop what's scrolled behind. All three run every frame regardless of round
+    // phase, so the tape keeps scrolling and generating independent of round state.
+    maybeRebaseWorld();
+    ensureBarsGenerated();
+    dropOldBars();
 
     var idx = terrainIndexAt(player.x);
     return {idx:idx, cam:cam};
@@ -653,10 +737,10 @@
 
   function resolveObstacles(){
     var centerIdx = terrainIndexAt(player.x);
-    var i0 = Math.max(0, centerIdx-2), i1 = Math.min(N_BARS-1, centerIdx+2);
+    var i0 = Math.max(0, centerIdx-2), i1 = centerIdx+2; // no upper clamp — index space is unbounded now
     for (var i=i0;i<=i1;i++){
       if (phase !== "running") break; // round already resolved this frame — don't overshoot the threshold
-      var b = bars[i];
+      var b = barAt(i);
       if (!b || b.resolved) continue;
       if (b.isObstacle && playerObstacleOverlap(b,i)){
         resolveBar(b, "hit");
@@ -722,11 +806,18 @@
     ctx.strokeStyle = "#2c5b3f";
     ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
 
-    if (bars){
+    // M2: `bars` is now a continuously-streaming window that's never null (and keeps
+    // generating during setup too — see ensureBarsGenerated()). The blind-commit
+    // reveal is still gated on phase here, same UX contract as before, just no
+    // longer keyed off a null/non-null `bars` sentinel. Judgment call: not moving
+    // this gate to the ladder is intentional — the setup-only reveal mechanic itself
+    // belongs to M4, not M2, which only touches how the terrain data is generated.
+    if (phase !== "setup"){
       var startI = Math.max(0, Math.floor(cam/COLW)-1);
-      var endI = Math.min(N_BARS-1, Math.ceil((cam+w)/COLW)+1);
+      var endI = Math.ceil((cam+w)/COLW)+1; // no upper clamp — index space is unbounded now
       for (var i=startI;i<=endI;i++){
-        var b = bars[i];
+        var b = barAt(i);
+        if (!b) continue; // outside the generated/kept window — shouldn't normally happen given the ahead-buffer
         var sx = i*COLW - cam;
         var col = b.bull ? "#6ef2a0" : "#ff6b5c";
         var bodyPx = clamp((b.top-b.bottom)*MAXH, 4, 85);
@@ -758,12 +849,12 @@
         }
       }
     } else {
-      // Setup phase: no round is locked in yet, so `bars` is still null and there's
-      // no tape to draw. That's intentional — the run stays blind until STOP + LIMIT
-      // are both set, so placement can't be biased by seeing the tape first. But with
-      // nothing drawn here the panel reads as broken (grid + player, nothing else),
-      // which is exactly what got reported as a rendering bug. This on-canvas cue
-      // doesn't reveal any tape data — it only explains the empty state.
+      // Setup phase: a round isn't locked in yet. The tape stays hidden on purpose —
+      // placement can't be biased by seeing it first — even though (as of M2) bars are
+      // actually being generated continuously behind the scenes the whole time. With
+      // nothing drawn here the panel would read as broken (grid + player, nothing
+      // else), which is exactly what got reported as a rendering bug. This on-canvas
+      // cue doesn't reveal any tape data — it only explains the empty state.
       ctx.textAlign = "center";
       ctx.fillStyle = "rgba(216,245,226,.42)";
       ctx.font = "20px 'VT323', monospace";
@@ -874,10 +965,10 @@
   }
 
   function lockInPosition(){
-    currentSeed = Math.floor(Math.random()*1e9);
-    rand = mulberry32(currentSeed);
-    genBars();
-    resetTerrainPlayer();
+    // M2: no reseed/regenerate here anymore — the tape is one continuous stream
+    // (see ensureBarsGenerated()); RNG just keeps advancing. Only the per-round
+    // vertical physics reset (not cam/player.x) happens on this transition.
+    resetTerrainPlayerVerticals();
     pnlTicks = 0;
     phase = "running";
     SoundFX.positionLocked();
@@ -886,14 +977,13 @@
 
   function newRound(){
     direction = Math.random() < 0.5 ? "LONG" : "SHORT";
-    bars = null;
     pnlTicks = 0;
     stopIdx = null; limitIdx = null; stopTicks = null; limitTicks = null;
     placementStep = "stop";
     genLevels();
     var side = sideForStep("stop");
     ladderPlayer.idx = ticksToIdx(side, MIN_TICKS);
-    resetTerrainPlayer();
+    resetTerrainPlayerVerticals();
     phase = "setup";
     banner = null;
     updateHud();
@@ -1136,7 +1226,15 @@
 
   var last = performance.now();
   function frame(now){
-    var dt = Math.min(0.033, (now-last)/1000);
+    // Floored at 0: the rAF timestamp on the very first frame can land slightly
+    // before the synchronous `performance.now()` captured into `last` above, giving
+    // a tiny negative dt. Before M2 that was harmless (cam was recomputed fresh from
+    // player.x every frame); now cam is its own independently-integrated value with
+    // its own floor clamp at exactly 0, so an unclamped negative dt on that one frame
+    // desyncs player.x and cam by a few pixels, permanently (cam's floor absorbs it,
+    // player.x's floor doesn't, since it starts well above its own floor). Flooring
+    // dt at 0 removes the asymmetry at the source instead of chasing it downstream.
+    var dt = Math.max(0, Math.min(0.033, (now-last)/1000));
     last = now;
     if (!helpOpen && phase !== "gameover"){
       var t = updateTerrain(dt);
