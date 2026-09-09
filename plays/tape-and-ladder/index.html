@@ -260,12 +260,11 @@
 <div class="wrap">
   <header>
     <h1>TAPE &amp; LADDER</h1>
-    <p class="thesis">Set your stop and limit on the ladder, then survive the tape. <kbd>H</kbd> for how to play.</p>
+    <p class="thesis">Set your starting leverage on the ladder, then survive the tape. <kbd>H</kbd> for how to play.</p>
   </header>
 
   <div class="toolbar">
     <div class="stats">
-      <span><span class="tag">ROUND</span><b id="roundVal">1</b></span>
       <span><span class="tag">SCORE</span><b id="scoreVal">0</b></span>
     </div>
     <button id="helpBtn" class="ghost" type="button" aria-pressed="false">Help &middot; H</button>
@@ -282,8 +281,8 @@
         <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
         <span><span class="tag">LEVERAGE</span> <span id="hudLeverage">&mdash;</span></span>
         <span><span class="tag">PNL</span> <span id="hudPnl">0</span></span>
-        <span><span class="tag">TO STOP</span> <span id="hudToStop">&mdash;</span></span>
-        <span><span class="tag">TO LIMIT</span> <span id="hudToLimit">&mdash;</span></span>
+        <span><span class="tag">EQUITY</span> <span id="hudEquity">&mdash;</span></span>
+        <span><span class="tag">CUSHION</span> <span id="hudCushion">&mdash;</span></span>
       </div>
     </section>
 
@@ -304,14 +303,14 @@
 <div id="helpOverlay" class="overlay" hidden>
   <div class="overlayCard">
     <h2>HOW TO PLAY</h2>
-    <p>Each round you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set a <b>STOP</b> and a <b>LIMIT</b> &mdash; both at least 3 ticks from entry. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you. Clear an obstacle for profit, miss it and it costs you. Bank your LIMIT and the run continues, a little harder. Hit your STOP and the run is over.</p>
+    <p>Each round you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set your <b>STARTING LEVERAGE</b> (1x-8x) before the tape reveals. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you, and keep adjusting leverage live on the ladder as you go &mdash; crossing entry flips LONG/SHORT. Clear an obstacle for profit, miss it and it costs you. Higher leverage swings your PnL harder both ways and shrinks your margin cushion &mdash; drawdown past that cushion is a <b>MARGIN CALL</b>, and the run is over.</p>
     <div class="kbrow"><kbd>&larr;</kbd><kbd>&rarr;</kbd> <span>run</span></div>
     <div class="kbrow"><kbd>&uarr;</kbd> <span>jump</span></div>
-    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor &mdash; sets stop/limit before the run, then live leverage (1x-8x) once running; crossing entry flips LONG/SHORT</span></div>
-    <div class="kbrow"><kbd>SPACE</kbd> <span>confirm stop, then confirm limit</span></div>
+    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor &mdash; sets starting leverage before the run, then live leverage (1x-8x) once running; crossing entry flips LONG/SHORT</span></div>
+    <div class="kbrow"><kbd>SPACE</kbd> <span>confirm starting leverage</span></div>
     <div class="kbrow"><kbd>R</kbd> <span>start a new run (resets score)</span></div>
     <p style="margin-top:10px;">On a touch device, the same actions are mirrored by the on-screen buttons at the bottom of the screen.</p>
-    <div class="lesson">The stop defines the loss before the round even starts. The tape doesn't know, and doesn't care, which side you took.</div>
+    <div class="lesson">Your starting leverage sets your margin cushion before you've seen a single candle. The tape doesn't know, and doesn't care, which side you took.</div>
     <button class="close" id="helpClose" type="button">Close</button>
   </div>
 </div>
@@ -320,7 +319,6 @@
   <div class="overlayCard">
     <h2>RUN OVER</h2>
     <div class="goScoreLine" id="goScore">0</div>
-    <p style="margin-top:-4px;">Rounds banked: <span id="goRounds">0</span></p>
     <p class="goMessage" id="goMessage"></p>
     <div class="goForm">
       <label for="initialsInput">INITIALS</label>
@@ -539,13 +537,12 @@
   });
 
   // ------------------------------------------------------------- GAME STATE
-  var MIN_TICKS = 3;                 // minimum stop/limit distance from entry — trivial risk/reward floor
   var MIN_OBSTACLE_GAP_COLS = 5;     // no two jump-obstacles closer than this, at any difficulty
   var DEATH_MESSAGES = [
-    "The stop didn't care how good the setup looked.",
+    "Leverage didn't care how good the setup looked.",
     "Risk was defined the moment you set it, not when it happened.",
     "The tape never knew which side you took.",
-    "That's what the stop is for."
+    "That's what the cushion is for."
   ];
 
   // M4: live leverage/direction control while running. LADDER_MOVE_COOLDOWN_MS caps
@@ -560,12 +557,29 @@
   var LADDER_FLIP_LOCKOUT_BEHIND = 2;
   var LADDER_FLIP_LOCKOUT_AHEAD = 3;
 
-  var phase = "setup";          // setup -> running -> roundwin|gameover
+  var phase = "setup";          // setup -> running -> gameover
   var direction = "LONG";       // this round's assigned side
-  var leverage = 1;             // M4: 1x-8x, set by ladder rung distance from entry while running
-  var round = 1, score = 0;
-  var placementStep = "stop";   // "stop" | "limit"
-  var stopIdx = null, limitIdx = null, stopTicks = null, limitTicks = null;
+  // M4: 1x-8x, set by ladder rung distance from entry while running. M6: also the
+  // player's chosen starting rung, confirmed during setup (see confirmStartingLeverage()).
+  var leverage = 1;
+  // Frozen forever as of M6 — nothing increments it anymore now that a margin call
+  // ends the whole run instead of cycling to a new round. obstacleThreshold() still
+  // reads it for its difficulty ramp; that ramp becoming static until it's replaced
+  // with a distance/time-based one is explicitly M7's job, not fixed here — see the
+  // M6 Status entry.
+  var round = 1;
+  // M6: margin-call death model. BASE_EQUITY/BASE_CUSHION are first-pass constants,
+  // same as M1's jump physics or M5.5's scroll speed were — need a playtest pass to
+  // tune. `equity` is cosmetic/display framing on top of pnlTicks (not itself used in
+  // any formula). `hwmTicks` is the running high-water-mark of pnlTicks since
+  // lockInPosition(), floored at 0 by construction (Math.max(hwmTicks, pnlTicks)
+  // starting from 0 never goes below it) so it satisfies the leaderboard's
+  // non-negative-integer contract even while live pnlTicks is negative — this is
+  // what gets submitted as the score, not the old round-banked `score` var (retired).
+  var BASE_EQUITY = 100;
+  var BASE_CUSHION = 18;
+  var equity = BASE_EQUITY;
+  var hwmTicks = 0;
   var pnlTicks = 0;
   var banner = null;            // {text, color, until}
   var helpOpen = false;
@@ -577,7 +591,7 @@
   var floatingTexts = [];
 
   function resetRun(){
-    round = 1; score = 0;
+    round = 1;
     // M5.5: a brand new run should feel like a first run again — restart the
     // scroll-speed ramp from its slow start rather than carrying over whatever
     // speed the previous run had reached.
@@ -1551,14 +1565,18 @@
   // M4: `leverage` (1x-8x, set live by the ladder cursor's distance from entry — see
   // doLadderMove()) scales every delta's magnitude both ways, same as read live at
   // resolution time — bigger swings up AND down, not just a directional safety net.
-  // Explicitly not touching the win/lose thresholds themselves (checkRoundOutcome
-  // still compares raw pnlTicks against stopTicks/limitTicks) — that model is M6.
   // M5a: factored the leverage-scaled apply-and-check step out into applyPnlDelta()
   // so hazards (and any future M5b type) share the exact same PnL pathway instead
   // of duplicating it at every call site.
+  // M6: replaced the round-based stop/limit win/lose check with a margin-call model
+  // (see checkMarginCall()) — every PnL change also updates hwmTicks, the running
+  // high-water-mark that both the live CUSHION readout and the final score are
+  // computed from.
   function applyPnlDelta(delta){
     pnlTicks += delta * leverage;
-    checkRoundOutcome();
+    hwmTicks = Math.max(hwmTicks, pnlTicks);
+    equity = BASE_EQUITY + pnlTicks;
+    checkMarginCall();
   }
 
   // M5.5: spawns a small, short-lived label at the player's current screen
@@ -1721,25 +1739,37 @@
     }
   }
 
-  function checkRoundOutcome(){
+  // M6: how much drawdown room is left before a margin call, at the *current*
+  // leverage — shared by checkMarginCall() and the HUD/ladder cushion readouts so
+  // they never drift out of sync with the actual kill condition. Not meaningful
+  // outside "running" (cushion/drawdown are only live concepts mid-run); callers
+  // gate their own display on phase.
+  function marginCushionRemainingTicks(){
+    var marginCushionTicks = BASE_CUSHION / leverage;
+    var drawdownTicks = hwmTicks - pnlTicks;
+    return Math.max(0, marginCushionTicks - drawdownTicks);
+  }
+
+  // M6: replaces checkRoundOutcome()'s stop/limit comparison — there's no more
+  // "win a round," the run just continues, live leverage scaling PnL swings both
+  // ways, until a real margin call ends the whole session. Formula per the design
+  // doc's Architecture section, recomputed live every check since `leverage` can
+  // change mid-run via the ladder cursor: cushion shrinks as leverage climbs, and
+  // dying is peak-to-trough drawdown (hwmTicks - pnlTicks) exceeding it.
+  function checkMarginCall(){
     if (phase !== "running") return;
-    if (pnlTicks >= limitTicks) winRound();
-    else if (pnlTicks <= -stopTicks) loseRun();
+    var marginCushionTicks = BASE_CUSHION / leverage;
+    var drawdownTicks = hwmTicks - pnlTicks;
+    if (drawdownTicks > marginCushionTicks) marginCall();
   }
 
-  function winRound(){
-    phase = "roundwin";
-    score += limitTicks;
-    SoundFX.roundWin();
-    banner = { text: "LIMIT HIT +" + limitTicks, color: "#6ef2a0", until: performance.now()+1100 };
-    setTimeout(function(){ round += 1; newRound(); }, 1150);
-  }
-
-  function loseRun(){
+  function marginCall(){
     phase = "gameover";
     SoundFX.stoppedOut();
-    banner = { text: "STOPPED OUT", color: "#ff6b5c", until: performance.now()+1000 };
+    banner = { text: "MARGIN CALL", color: "#ff6b5c", until: performance.now()+1000 };
     var msg = DEATH_MESSAGES[Math.floor(Math.random()*DEATH_MESSAGES.length)];
+    // M6: leaderboard submits hwmTicks, not the retired round-banked `score` var —
+    // showGameOver() reads it straight off the live state, nothing to pass here.
     setTimeout(function(){ showGameOver(msg); }, 1050);
   }
 
@@ -2125,17 +2155,24 @@
     var posEl = document.getElementById("hudPosition");
     var levEl = document.getElementById("hudLeverage");
     var pnlEl = document.getElementById("hudPnl");
-    var toStopEl = document.getElementById("hudToStop");
-    var toLimitEl = document.getElementById("hudToLimit");
+    var equityEl = document.getElementById("hudEquity");
+    var cushionEl = document.getElementById("hudCushion");
     posEl.textContent = direction;
     posEl.className = direction === "LONG" ? "up" : "down";
     levEl.textContent = phase === "running" ? (leverage + "x") : "—";
     pnlEl.textContent = (pnlTicks >= 0 ? "+" : "") + pnlTicks;
     pnlEl.className = pnlTicks >= 0 ? "up" : "down";
-    toStopEl.textContent = stopTicks != null ? Math.max(0, stopTicks + pnlTicks) : "—";
-    toLimitEl.textContent = limitTicks != null ? Math.max(0, limitTicks - pnlTicks) : "—";
-    document.getElementById("roundVal").textContent = round;
-    document.getElementById("scoreVal").textContent = score;
+    // M6: EQUITY/CUSHION replace the old TO STOP/TO LIMIT readouts — cushion is
+    // remaining drawdown room before a margin call at the *current* leverage (see
+    // marginCushionRemainingTicks()), so it visibly shrinks as the player levers up.
+    equityEl.textContent = phase === "running" ? Math.round(equity) : "—";
+    cushionEl.textContent = phase === "running" ? Math.round(marginCushionRemainingTicks()) : "—";
+    // M6: SCORE now shows hwmTicks live (the same value that gets submitted to the
+    // leaderboard at game-over) instead of the retired round-banked `score` var.
+    // ROUND is gone from the toolbar — `round` is frozen at 1 as of this milestone
+    // (see its declaration comment) and displaying a number that never changes was
+    // more confusing than informative.
+    document.getElementById("scoreVal").textContent = hwmTicks;
 
     // M5.5: always-visible core-loop statement (see .loopCue in <style> for why
     // this isn't gated behind Help). Candle color (bull=green/bear=red) is fixed
@@ -2177,42 +2214,33 @@
   function idxToTicks(idx){ return idx < BID_N ? (BID_N-idx) : (idx-BID_N+1); }
   function ticksToIdx(side, ticks){ return side === "bid" ? (BID_N-ticks) : (BID_N-1+ticks); }
 
-  function sideForStep(step){
-    var isStop = step === "stop";
-    if (direction === "LONG") return isStop ? "bid" : "ask";
-    return isStop ? "ask" : "bid";
-  }
-  function rangeForSide(side){
-    return side === "bid" ? {minIdx:0, maxIdx:BID_N-MIN_TICKS} : {minIdx:BID_N+MIN_TICKS-1, maxIdx:TOTAL-1};
-  }
-
-  // M4: the running-phase side of the ladder. Distinct from sideForStep(), which is
-  // about where a STOP/LIMIT *order* sits relative to your direction (unchanged, still
-  // setup-only) — this is about which half of the ladder represents *being* LONG vs
-  // SHORT while the leverage cursor is live. Climbing up (higher idx, visually higher
-  // on the ladder — see ladderRowY()) always means "further up the price ladder";
-  // since idx>=BID_N is the ask half (above entry) and idx<BID_N is the bid half
-  // (below), climbing into ask == LONG and climbing into bid == SHORT falls straight
-  // out of that, with idxToTicks() giving the 1-8 leverage rung for free.
+  // M4: which half of the ladder represents *being* LONG vs SHORT. Climbing up
+  // (higher idx, visually higher on the ladder — see ladderRowY()) always means
+  // "further up the price ladder"; since idx>=BID_N is the ask half (above entry)
+  // and idx<BID_N is the bid half (below), climbing into ask == LONG and climbing
+  // into bid == SHORT falls straight out of that, with idxToTicks() giving the 1-8
+  // leverage rung for free. M6: also used by newRound() to place the blind setup
+  // cursor on the correct side for the round's randomly-assigned direction — the
+  // old stop/limit-specific sideForStep()/rangeForSide() are gone now that setup is
+  // a single leverage placement using the same range as the running-phase cursor.
   function sideForDirection(dir){ return dir === "LONG" ? "ask" : "bid"; }
 
   // Shared by keyboard (W/S) and touch (climb up/down buttons) so both drive the exact
-  // same clamped range + sound cue. Two very different phases share this entry point:
-  //  - "setup": unchanged from before M4 — clamped to the current placementStep's
-  //    valid stop/limit range, no rate cap (placing an order isn't a leverage/direction
-  //    lever, so the anti-spam cap in the ticket doesn't apply here).
-  //  - "running" (M4): the cursor is now a continuous leverage/direction control. It
-  //    can move anywhere across the full 0..TOTAL-1 range (no MIN_TICKS reservation —
-  //    that was only ever about leaving room for a second stop/limit placement), rate-
-  //    capped to LADDER_MOVE_COOLDOWN_MS per rung, and crossing the BID_N boundary
-  //    flips `direction` (and reclassifies the tape ahead of the lockout window — see
-  //    reclassifyUnresolvedBars()).
+  // same clamped range + sound cue. Two phases share this entry point:
+  //  - "setup" (M6): choosing a starting leverage rung before the tape reveals.
+  //    Clamped to the full 0..TOTAL-1 range — same range the running-phase cursor
+  //    uses below, not the old MIN_TICKS-reserved half-range, which only ever
+  //    existed to leave room for a second stop/limit placement that no longer
+  //    happens. No rate cap: this one blind placement isn't the spammable
+  //    leverage/direction lever the live running-phase cursor is.
+  //  - "running" (M4): a continuous leverage/direction control. Moves anywhere
+  //    across the full 0..TOTAL-1 range, rate-capped to LADDER_MOVE_COOLDOWN_MS per
+  //    rung, and crossing the BID_N boundary flips `direction` (and reclassifies
+  //    the tape ahead of the lockout window — see reclassifyUnresolvedBars()).
   function doLadderMove(delta){
     if (phase === "setup"){
-      var side = sideForStep(placementStep);
-      var range = rangeForSide(side);
       var prevIdx = ladderPlayer.idx;
-      ladderPlayer.idx = clamp(ladderPlayer.idx+delta, range.minIdx, range.maxIdx);
+      ladderPlayer.idx = clamp(ladderPlayer.idx+delta, 0, TOTAL-1);
       if (ladderPlayer.idx !== prevIdx) SoundFX.climbStep();
       return;
     }
@@ -2238,20 +2266,13 @@
     }
   }
 
-  function confirmPlacement(){
-    if (placementStep === "stop"){
-      stopIdx = ladderPlayer.idx;
-      stopTicks = idxToTicks(stopIdx);
-      placementStep = "limit";
-      var side = sideForStep("limit");
-      ladderPlayer.idx = ticksToIdx(side, MIN_TICKS);
-      SoundFX.spreadCross();
-      updateHud();
-    } else {
-      limitIdx = ladderPlayer.idx;
-      limitTicks = idxToTicks(limitIdx);
-      lockInPosition();
-    }
+  // M6: replaces the old two-step confirmPlacement() (stop, then limit) — there's
+  // no more stop/limit distance to choose, so the blind-commit setup collapses to
+  // one press: whatever rung the cursor is sitting on becomes the starting
+  // leverage the run locks in with.
+  function confirmStartingLeverage(){
+    leverage = idxToTicks(ladderPlayer.idx);
+    lockInPosition();
   }
 
   function lockInPosition(){
@@ -2260,12 +2281,13 @@
     // vertical physics reset (not cam/player.x) happens on this transition.
     resetTerrainPlayerVerticals();
     pnlTicks = 0;
+    hwmTicks = 0;
+    equity = BASE_EQUITY;
     phase = "running";
-    // M4: hand the ladder cursor over to running-phase leverage/direction semantics —
-    // start at 1x on whichever side matches the direction the round was assigned, i.e.
-    // right at the entry line, the least-aggressive rung on the correct side.
-    leverage = 1;
-    ladderPlayer.idx = ticksToIdx(sideForDirection(direction), 1);
+    // M6: `leverage` and ladderPlayer.idx are already whatever the player just
+    // confirmed in confirmStartingLeverage() above — no more hardcoding leverage=1
+    // and re-snapping the cursor back to the entry rung. The blind starting-leverage
+    // choice now actually carries into the run instead of being dead weight.
     lastLadderMoveAt = -Infinity;
     SoundFX.positionLocked();
     updateHud();
@@ -2275,11 +2297,11 @@
     direction = Math.random() < 0.5 ? "LONG" : "SHORT";
     leverage = 1;
     pnlTicks = 0;
-    stopIdx = null; limitIdx = null; stopTicks = null; limitTicks = null;
-    placementStep = "stop";
     genLevels();
-    var side = sideForStep("stop");
-    ladderPlayer.idx = ticksToIdx(side, MIN_TICKS);
+    // M6: single blind placement now — start the cursor at the least-aggressive
+    // rung (1x) on whichever side matches the assigned direction, but (unlike the
+    // old stop step) leave the full range open to move in; see doLadderMove().
+    ladderPlayer.idx = ticksToIdx(sideForDirection(direction), 1);
     resetTerrainPlayerVerticals();
     phase = "setup";
     banner = null;
@@ -2306,21 +2328,20 @@
     var maxSize = 0;
     for (var k=0;k<levels.length;k++) maxSize = Math.max(maxSize, levels[k].size);
 
-    var inSetup = phase === "setup";
-    var activeSide = inSetup ? sideForStep(placementStep) : null;
-    var activeRange = inSetup ? rangeForSide(activeSide) : null;
-
+    // M6: setup is a single leverage placement across the full ladder now (see
+    // doLadderMove()) — every row is a valid choice, so the old dim-invalid-rows
+    // treatment (tied to the removed side-restricted stop/limit range) is gone.
+    // The cursor's own row stays highlighted at full opacity in both phases; the
+    // old STOP/LIMIT row labels are gone too since nothing else is pinned to a
+    // fixed row anymore.
     for (var i=0;i<levels.length;i++){
       var lv = levels[i];
       var row = ladderRowY(i);
       var barW = 30 + (w-90) * (lv.size/maxSize);
       var x = (w-barW)/2;
       var col = lv.side==="bid" ? "#6ef2a0" : "#ff6b5c";
-      var rowSide = i<BID_N ? "bid" : "ask";
-      var isValidNow = inSetup && rowSide===activeSide && i>=activeRange.minIdx && i<=activeRange.maxIdx;
-      var dim = inSetup && !isValidNow;
 
-      ctx.globalAlpha = dim ? .22 : (i===ladderPlayer.idx && inSetup ? 1 : .68);
+      ctx.globalAlpha = i===ladderPlayer.idx ? 1 : .68;
       ctx.fillStyle = col;
       ctx.fillRect(x, row.y+3, barW, row.h-6);
       ctx.globalAlpha = 1;
@@ -2335,23 +2356,12 @@
       ctx.fillText(lv.price.toFixed(2), w-8, row.y+row.h/2);
       ctx.textAlign = "left";
 
-      if (!inSetup && stopIdx===i){
-        ctx.fillStyle = "#ff6b5c";
-        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
-        ctx.fillText("STOP", x+8, row.y+row.h/2-9);
-      }
-      if (!inSetup && limitIdx===i){
-        ctx.fillStyle = "#6ef2a0";
-        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
-        ctx.fillText("LIMIT", x+8, row.y+row.h/2-9);
-      }
-      // M4: while running, the cursor row itself is the live leverage rung — labeled
-      // separately from STOP/LIMIT (which stay put at whatever rows they were set on
-      // during setup and no longer move).
-      if (phase === "running" && ladderPlayer.idx===i && stopIdx!==i && limitIdx!==i){
+      // M6: the cursor row is the live leverage rung in both setup (starting
+      // choice) and running (live control) phases.
+      if (ladderPlayer.idx===i){
         ctx.fillStyle = "#d8f5e2";
         ctx.font = "bold 10px 'IBM Plex Mono', monospace";
-        ctx.fillText(leverage + "x", x+8, row.y+row.h/2-9);
+        ctx.fillText(idxToTicks(i) + "x", x+8, row.y+row.h/2-9);
       }
     }
 
@@ -2364,9 +2374,9 @@
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.fillText("ENTRY", 8, mid-8);
 
-    // M4: the cursor marker is no longer setup-only — it's the live leverage/direction
-    // rung while running too (see doLadderMove()'s running-phase branch).
-    if (inSetup || phase === "running"){
+    // M4: the cursor marker is live in both setup and running phase (see
+    // doLadderMove()'s two phase branches).
+    if (phase === "setup" || phase === "running"){
       var pr = ladderRowY(ladderPlayer.idx);
       ctx.shadowColor = "#d8f5e2";
       ctx.shadowBlur = 8;
@@ -2378,15 +2388,16 @@
 
   function updateLadderHud(){
     if (phase === "setup"){
-      var stepLabel = placementStep === "stop" ? "SET STOP" : "SET LIMIT";
-      lLevelEl.innerHTML = "<b>" + stepLabel + "</b> &mdash; " + idxToTicks(ladderPlayer.idx) + " ticks";
-    } else if (stopTicks != null){
-      // M4: leverage/direction are live while running — surfaced here alongside the
-      // (now-fixed) stop/limit distances so the ladder panel always shows what the
-      // cursor is currently doing.
+      lLevelEl.innerHTML = "<b>SET STARTING LEVERAGE</b> &mdash; " + idxToTicks(ladderPlayer.idx) + "x";
+    } else if (phase === "running"){
+      // M6: leverage/direction stay live here (M4). The old fixed STOP/LIMIT
+      // distances are gone — replaced with the same live EQUITY/CUSHION figures
+      // the main HUD shows, so the ladder panel alone tells you how much room is
+      // left before a margin call without cross-referencing the terrain panel.
       var dirCls = direction === "LONG" ? "up" : "down";
-      lLevelEl.innerHTML = '<span class="down">STOP -' + stopTicks + '</span> &middot; <span class="up">LIMIT +' + limitTicks + '</span>' +
-        ' &middot; <b class="' + dirCls + '">' + leverage + 'x ' + direction + '</b>';
+      lLevelEl.innerHTML = '<b class="' + dirCls + '">' + leverage + 'x ' + direction + '</b>' +
+        ' &middot; EQUITY ' + Math.round(equity) +
+        ' &middot; CUSHION ' + Math.round(marginCushionRemainingTicks());
     }
   }
 
@@ -2438,9 +2449,10 @@
     document.getElementById("lbSource").textContent = isLocal ? "LOCAL (offline)" : "GLOBAL";
   }
 
+  // M6: the leaderboard submits hwmTicks (the run's high-water-mark PnL), not the
+  // retired round-banked `score` var — see the design doc's explicit scoring call.
   function showGameOver(msg){
-    document.getElementById("goScore").textContent = score;
-    document.getElementById("goRounds").textContent = round-1;
+    document.getElementById("goScore").textContent = hwmTicks;
     document.getElementById("goMessage").textContent = msg;
     document.getElementById("lbSource").textContent = "";
     document.getElementById("lbList").innerHTML = "";
@@ -2453,8 +2465,8 @@
   document.getElementById("goSubmit").addEventListener("click", function(){
     var input = document.getElementById("initialsInput");
     var initials = (input.value || "").trim().toUpperCase().slice(0,3) || "---";
-    saveLocalScore(initials, score);
-    submitScore(initials, score).then(function(){
+    saveLocalScore(initials, hwmTicks);
+    submitScore(initials, hwmTicks).then(function(){
       return fetchLeaderboard();
     }).then(function(remote){
       if (remote) renderLeaderboard(remote, false);
@@ -2495,14 +2507,14 @@
     if (e.repeat) return;
     if (e.key === "ArrowUp") jumpQueued = true;
 
-    // M4: W/S now drive the ladder in both "setup" (placing stop/limit) and "running"
-    // (live leverage/direction) phases — doLadderMove() itself branches on phase and
-    // no-ops outside both. Confirm (SPACE/Enter) stays setup-only; calling
-    // confirmPlacement() while running would re-run the stop/limit-lock flow on a
-    // position that's already locked in.
+    // M4: W/S now drive the ladder in both "setup" (M6: choosing starting leverage)
+    // and "running" (live leverage/direction) phases — doLadderMove() itself branches
+    // on phase and no-ops outside both. Confirm (SPACE/Enter) stays setup-only; calling
+    // confirmStartingLeverage() while running would re-lock a position that's already
+    // locked in.
     if (e.key === "w" || e.key === "W") doLadderMove(1);
     if (e.key === "s" || e.key === "S") doLadderMove(-1);
-    if (phase === "setup" && (e.key === " " || e.key === "Enter")) confirmPlacement();
+    if (phase === "setup" && (e.key === " " || e.key === "Enter")) confirmStartingLeverage();
   }, {passive:false});
   window.addEventListener("keyup", function(e){ keysHeld[e.key]=false; });
 
@@ -2533,7 +2545,7 @@
     else if (action === "jump") bindHold(btnEl, function(){ jumpQueued = true; keysHeld["ArrowUp"] = true; }, function(){ keysHeld["ArrowUp"] = false; });
     else if (action === "climbUp") bindTap(btnEl, function(){ doLadderMove(1); });
     else if (action === "climbDown") bindTap(btnEl, function(){ doLadderMove(-1); });
-    else if (action === "confirm") bindTap(btnEl, function(){ if (phase === "setup") confirmPlacement(); });
+    else if (action === "confirm") bindTap(btnEl, function(){ if (phase === "setup") confirmStartingLeverage(); });
     else if (action === "restart") bindTap(btnEl, function(){ resetRun(); });
   });
 
