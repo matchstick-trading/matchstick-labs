@@ -730,6 +730,21 @@
           ctx.globalAlpha = 1;
         }
       }
+    } else {
+      // Setup phase: no round is locked in yet, so `bars` is still null and there's
+      // no tape to draw. That's intentional — the run stays blind until STOP + LIMIT
+      // are both set, so placement can't be biased by seeing the tape first. But with
+      // nothing drawn here the panel reads as broken (grid + player, nothing else),
+      // which is exactly what got reported as a rendering bug. This on-canvas cue
+      // doesn't reveal any tape data — it only explains the empty state.
+      ctx.textAlign = "center";
+      ctx.fillStyle = "rgba(216,245,226,.42)";
+      ctx.font = "20px 'VT323', monospace";
+      ctx.fillText("TAPE IS HIDDEN UNTIL YOU LOCK IN", w/2, h/2 - 8);
+      ctx.fillStyle = "rgba(216,245,226,.26)";
+      ctx.font = "13px 'IBM Plex Mono', monospace";
+      ctx.fillText("set STOP + LIMIT on the ladder to start the run", w/2, h/2 + 15);
+      ctx.textAlign = "left";
     }
 
     var px = player.x - cam - PLAYER_W/2;
