@@ -277,7 +277,7 @@
     <section class="panel">
       <h2>TERRAIN &mdash; <span>the tape you run</span></h2>
       <p class="loopCue" id="loopCue"></p>
-      <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="360" aria-label="Candle terrain runner"></canvas></div>
+      <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="402" aria-label="Candle terrain runner"></canvas></div>
       <div class="hud">
         <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
         <span><span class="tag">LEVERAGE</span> <span id="hudLeverage">&mdash;</span></span>
@@ -605,6 +605,31 @@
   }
 
   var COLW = 24, MAXH = 230, BASE_MARGIN = 26;
+  // M5.75: playtester feedback ("why are we running on the volume bars? I expected
+  // candlesticks centered on the chart") traced to a real structural gap, not just a
+  // styling one — the runway has only ever drawn each bar's MAGNITUDE (top-bottom,
+  // always grown up from a zero baseline), never its LEVEL (where open/close/wick sit
+  // within the bar's own [0,1] random-walk range). A magnitude-from-zero bar chart is
+  // structurally a volume histogram no matter how it's colored; a price chart has to
+  // show the level moving. Fix: add a real, continuous, floating candlestick pane
+  // (PRICE_LANE_*) above the runway that plots every bar's actual open/close/wickHi/
+  // wickLo level via mapPriceY() — same underlying bar data, just finally showing
+  // level instead of only magnitude — plus an explicitly-labeled VOL_PANE_H strip
+  // below the (unchanged) runway showing bodyMag, since that magnitude-only shape is
+  // genuinely what a volume histogram looks like and deserves its own honest label
+  // instead of masquerading as price. Judgment call: left the runway/obstacle
+  // collision geometry (topY = baseline - hurdlePx, full solid column) completely
+  // untouched rather than detaching obstacles from baseline to float at their real
+  // price level too — that would turn every obstacle into a variable-height flying
+  // hazard (sometimes floating harmlessly overhead, sometimes blocking at head
+  // height, sometimes unavoidable) with its own fairness/timing model that M3/M5.5
+  // never tuned for and would need its own playtest cycle. That fuller "obstacles
+  // (and support/resistance) are lanes you jump between, not just hurdles" rework is
+  // deliberately deferred — see the M8 entry in Milestones below. This pass only
+  // makes the reference chart honest; it doesn't change what the player interacts
+  // with.
+  var VOL_PANE_H = 42;
+  var PRICE_LANE_TOP_PX = 28, PRICE_LANE_H = 118;
   // M2 streaming terrain: bar-index space is unbounded (no more fixed N_BARS array —
   // "no more end of the world"). GEN_AHEAD_BARS is how far past the camera's leading
   // edge stays generated; DROP_MARGIN_BARS is the small trailing buffer kept behind
@@ -1317,7 +1342,21 @@
     }
   }
 
-  function baselineY(){ return tSurf.h - BASE_MARGIN; }
+  // M5.75: reserves VOL_PANE_H px at the bottom of the canvas for the new volume
+  // strip. Every hurdle/collision/gap-void computation reads baselineY() as a
+  // function rather than a cached constant, so this one change uniformly shifts the
+  // whole runway up by VOL_PANE_H and nothing else needs touching.
+  function baselineY(){ return tSurf.h - BASE_MARGIN - VOL_PANE_H; }
+
+  // M5.75: maps a bar's normalized [0,1] price level (open/close/wickHi/wickLo — see
+  // genNextBar()) to a Y position inside the fixed PRICE_LANE_* band, high price at
+  // the top like every real price pane. Unlike the runway (which only ever shows a
+  // bar's magnitude), this preserves the bar's actual LEVEL, so the plotted line
+  // genuinely tracks the random walk up and down over time instead of always sitting
+  // on a zero baseline.
+  function mapPriceY(norm){
+    return PRICE_LANE_TOP_PX + PRICE_LANE_H - norm*PRICE_LANE_H;
+  }
   // No more upper clamp — bar-index space is unbounded now ("no more end of the
   // world"). Still floored at 0: world-space never goes negative.
   function terrainIndexAt(worldX){ return Math.max(0, Math.floor(worldX/COLW)); }
@@ -1920,9 +1959,28 @@
     ctx.lineWidth = 1;
     for (var gx=0; gx<w; gx+=40){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
 
+    // M5.75: price-lane pane frame + divider, drawn every frame (including setup)
+    // so the layout reads as three fixed panes from the very first frame, same as a
+    // real trading platform's chart shell before any data loads.
+    ctx.fillStyle = "rgba(110,242,160,.035)";
+    ctx.fillRect(0, PRICE_LANE_TOP_PX - 6, w, PRICE_LANE_H + 12);
+    ctx.strokeStyle = "rgba(110,242,160,.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, PRICE_LANE_TOP_PX + PRICE_LANE_H + 6); ctx.lineTo(w, PRICE_LANE_TOP_PX + PRICE_LANE_H + 6); ctx.stroke();
+    ctx.font = "11px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "rgba(216,245,226,.4)";
+    ctx.fillText("PRICE", 6, PRICE_LANE_TOP_PX - 10);
+
     var baseline = baselineY();
     ctx.strokeStyle = "#2c5b3f";
     ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
+
+    // M5.75: volume-pane frame, reserved by VOL_PANE_H in baselineY(). Labeled
+    // explicitly so the strip reads as its own object, not a second price series.
+    ctx.strokeStyle = "rgba(216,245,226,.12)";
+    ctx.beginPath(); ctx.moveTo(0, tSurf.h - BASE_MARGIN - VOL_PANE_H); ctx.lineTo(w, tSurf.h - BASE_MARGIN - VOL_PANE_H); ctx.stroke();
+    ctx.fillStyle = "rgba(216,245,226,.32)";
+    ctx.fillText("VOL", 6, tSurf.h - BASE_MARGIN - VOL_PANE_H + 12);
 
     // M2: `bars` is now a continuously-streaming window that's never null (and keeps
     // generating during setup too — see ensureBarsGenerated()). The blind-commit
@@ -1968,6 +2026,34 @@
         ctx.moveTo(sx+COLW/2, topY);
         ctx.lineTo(sx+COLW/2, baseline-wickPx);
         ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // M5.75: the real, level-preserving candlestick reference pane — see the
+        // comment above mapPriceY(). Drawn from the same `b` as the runway hurdle
+        // just above, so it's honestly the same tape shown twice, not a second
+        // fabricated data source. Thin body + wick both above AND below the body
+        // (unlike the runway hurdle, which only ever grows up from baseline) is
+        // what actually reads as a candlestick rather than a column.
+        var pBodyTop = mapPriceY(b.top), pBodyBottom = mapPriceY(b.bottom);
+        var pBodyH = Math.max(1.5, pBodyBottom - pBodyTop);
+        ctx.globalAlpha = b.isObstacle ? .95 : .55;
+        ctx.fillStyle = col;
+        ctx.fillRect(sx+7, pBodyTop, COLW-14, pBodyH);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx+COLW/2, mapPriceY(b.wickHi));
+        ctx.lineTo(sx+COLW/2, mapPriceY(b.wickLo));
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // M5.75: volume pane — reuses bodyMag, the exact magnitude-from-zero shape
+        // the runway used to (mis)represent as price. Same data, honestly labeled.
+        var volPx = clamp(b.bodyMag*VOL_PANE_H*1.05, 2, VOL_PANE_H-4);
+        var volBaseY = tSurf.h - BASE_MARGIN;
+        ctx.globalAlpha = .5;
+        ctx.fillStyle = col;
+        ctx.fillRect(sx+5, volBaseY - volPx, COLW-10, volPx);
         ctx.globalAlpha = 1;
 
         if (b.resolved){
