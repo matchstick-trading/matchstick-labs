@@ -41,11 +41,19 @@
   }
   .thesis{
     color:var(--muted);
-    font-size:.95rem;
+    font-size:.9rem;
     max-width:62ch;
     line-height:1.5;
   }
-  .thesis em{color:var(--paper);font-style:normal;}
+  .thesis kbd{
+    display:inline-block;
+    padding:1px 6px;
+    border:1px solid var(--phosphor-dim);
+    border-radius:2px;
+    color:var(--phosphor);
+    font-size:.78rem;
+    background:rgba(110,242,160,.06);
+  }
 
   .toolbar{
     display:flex;
@@ -56,24 +64,14 @@
     background:var(--panel);
     border:1px solid var(--rule);
   }
-  .legend{
+  .stats{
     display:flex;
-    flex-wrap:wrap;
-    gap:14px;
-    font-size:.78rem;
-    color:var(--muted);
-    letter-spacing:.02em;
+    gap:16px;
+    font-size:.85rem;
+    letter-spacing:.03em;
   }
-  .legend b{color:var(--paper);font-weight:600;}
-  .legend kbd{
-    display:inline-block;
-    padding:1px 6px;
-    border:1px solid var(--phosphor-dim);
-    border-radius:2px;
-    color:var(--phosphor);
-    font-size:.72rem;
-    background:rgba(110,242,160,.06);
-  }
+  .stats .tag{color:var(--muted);font-size:.7rem;letter-spacing:.08em;margin-right:4px;}
+  .stats b{color:var(--phosphor);font-weight:600;}
   button{
     margin-left:auto;
     font-family:inherit;
@@ -124,12 +122,14 @@
   .panel h2 span{color:var(--phosphor);}
   .canvas-shell{
     position:relative;
+    min-width:0;
     background:
       repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, transparent 1px, transparent 3px);
   }
   canvas{display:block;width:100%;height:auto;}
   .hud{
     display:flex;
+    flex-wrap:wrap;
     justify-content:space-between;
     gap:10px;
     padding:9px 14px;
@@ -161,21 +161,103 @@
     97%{filter:brightness(1.04);}
     98%{filter:brightness(.98);}
   }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(10,15,12,.86);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50; padding:20px;
+  }
+  .overlayCard{
+    background:var(--panel);
+    border:1px solid var(--phosphor-dim);
+    max-width:480px; width:100%;
+    padding:22px 24px;
+    box-shadow:0 0 40px rgba(110,242,160,.12);
+  }
+  .overlayCard h2{
+    font-family:"VT323",monospace;
+    font-size:1.6rem;
+    letter-spacing:.04em;
+    color:var(--phosphor);
+    margin:0 0 12px;
+  }
+  .overlayCard p{color:var(--muted);font-size:.85rem;line-height:1.6;margin:0 0 10px;}
+  .overlayCard .close{
+    display:block; margin:16px 0 0 auto; background:transparent; color:var(--muted);
+    border:1px solid var(--rule); text-transform:none; letter-spacing:0; font-size:.78rem;
+  }
+  .overlayCard .close:hover{color:var(--paper);border-color:var(--phosphor-dim);}
+  .kbrow{display:flex; gap:10px; align-items:baseline; margin:6px 0; font-size:.85rem;}
+  .kbrow kbd{
+    display:inline-block; min-width:1.6em; text-align:center;
+    padding:2px 6px; border:1px solid var(--phosphor-dim); border-radius:2px;
+    color:var(--phosphor); font-size:.78rem; background:rgba(110,242,160,.06);
+  }
+  .lesson{
+    margin-top:14px; padding:10px 12px;
+    border-left:2px solid var(--phosphor-dim);
+    color:var(--paper); font-size:.82rem; line-height:1.55;
+  }
+
+  .goScoreLine{font-family:"VT323",monospace; font-size:2.6rem; color:var(--phosphor); line-height:1; margin:2px 0 4px;}
+  .goMessage{color:var(--paper); font-size:.88rem; font-style:italic; margin:0 0 16px;}
+  .goForm{display:flex; gap:8px; align-items:center; margin-bottom:14px;}
+  .goForm label{color:var(--muted); font-size:.78rem; letter-spacing:.06em;}
+  .goForm input{
+    font-family:inherit; font-size:1.1rem; letter-spacing:.2em; text-transform:uppercase;
+    width:5em; padding:6px 8px; background:var(--void); color:var(--paper);
+    border:1px solid var(--phosphor-dim); text-align:center;
+  }
+  .goForm input:focus-visible{outline:2px solid var(--phosphor); outline-offset:1px;}
+  .goActions{display:flex; gap:8px; flex-wrap:wrap;}
+  .lbHead{display:flex; justify-content:space-between; align-items:baseline; margin-top:16px; border-top:1px solid var(--rule); padding-top:12px;}
+  .lbHead h3{font-family:"VT323",monospace; font-size:1.15rem; color:var(--muted); margin:0; letter-spacing:.05em;}
+  #lbSource{font-size:.68rem; color:var(--muted); letter-spacing:.08em;}
+  #lbList{list-style:none; margin:8px 0 0; padding:0; font-size:.85rem;}
+  #lbList li{display:flex; gap:10px; padding:3px 0; border-bottom:1px dotted var(--rule);}
+  #lbList .lbRank{color:var(--muted); width:1.6em;}
+  #lbList .lbInit{color:var(--phosphor); flex:1; letter-spacing:.1em;}
+  #lbList .lbScore{color:var(--paper); font-variant-numeric:tabular-nums;}
+  #lbList .lbEmpty{color:var(--muted); border:none;}
+
+  body.touchMode{padding-bottom:112px;}
+  .touchControls{
+    display:none;
+    position:fixed; left:0; right:0; bottom:0;
+    background:rgba(10,15,12,.94);
+    border-top:1px solid var(--rule);
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    gap:8px;
+    z-index:40;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .touchControls.active{display:flex;}
+  .touchBtn{
+    font-family:inherit; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--phosphor); background:rgba(110,242,160,.08);
+    border:1px solid var(--phosphor-dim);
+    padding:13px 15px; min-width:3.4em; text-align:center; border-radius:2px;
+    -webkit-user-select:none; user-select:none; touch-action:manipulation;
+  }
+  .touchBtn:active{background:rgba(110,242,160,.24);}
 </style>
 
 <div class="wrap">
   <header>
     <h1>TAPE &amp; LADDER</h1>
-    <p class="thesis">Everything below is a number. <em>If you can see it, you can stand on it</em> &mdash; the price tape as terrain to run and jump, the order book as a wall of ledges to climb. No charts, no 3D, just glyphs mapped from data, same trick as the ASCII heightmap game this borrows from.</p>
+    <p class="thesis">Set your stop and limit on the ladder, then survive the tape. <kbd>H</kbd> for how to play.</p>
   </header>
 
   <div class="toolbar">
-    <div class="legend">
-      <span><b>Terrain</b> <kbd>&larr;</kbd><kbd>&rarr;</kbd> run &middot; <kbd>&uarr;</kbd> jump</span>
-      <span><b>Ladder</b> <kbd>W</kbd> climb up &middot; <kbd>S</kbd> climb down</span>
+    <div class="stats">
+      <span><span class="tag">ROUND</span><b id="roundVal">1</b></span>
+      <span><span class="tag">SCORE</span><b id="scoreVal">0</b></span>
     </div>
-    <button id="regen" type="button">New session &middot; R</button>
+    <button id="helpBtn" class="ghost" type="button" aria-pressed="false">Help &middot; H</button>
     <button id="soundToggle" class="ghost" type="button" aria-pressed="true">Sound &middot; ON</button>
+    <button id="regen" type="button">New run &middot; R</button>
   </div>
 
   <div class="panels">
@@ -183,36 +265,88 @@
       <h2>TERRAIN &mdash; <span>the tape you run</span></h2>
       <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="360" aria-label="Candle terrain runner"></canvas></div>
       <div class="hud">
-        <span><span class="tag">BAR</span> <span id="tBar">&mdash;</span></span>
-        <span id="tOhlc"><span class="tag">O/H/L/C</span> &mdash;</span>
+        <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
+        <span><span class="tag">PNL</span> <span id="hudPnl">0</span></span>
+        <span><span class="tag">TO STOP</span> <span id="hudToStop">&mdash;</span></span>
+        <span><span class="tag">TO LIMIT</span> <span id="hudToLimit">&mdash;</span></span>
       </div>
     </section>
 
     <section class="panel">
-      <h2>THE LADDER &mdash; <span>the book you climb</span></h2>
+      <h2>THE LADDER &mdash; <span>set your risk</span></h2>
       <div class="canvas-shell"><canvas id="ladderCanvas" width="360" height="360" aria-label="Order book climbing wall"></canvas></div>
       <div class="hud">
-        <span class="tag">STANDING ON</span>
         <span id="lLevel">&mdash;</span>
       </div>
     </section>
   </div>
 
   <footer>
-    An early sketch exploring one question: what's the smallest interaction that proves a spatial
-    way of browsing market data? Left panel maps <code>max(open,close)</code> per bar to a walkable
-    ledge, the wick above it to a thin non-solid spike. Right panel maps order size to ledge width;
-    climbing crosses the spread. Synthetic data, regenerates each run &mdash; not wired to any real
-    session or trading system.
+    Synthetic data, regenerates every round &mdash; not wired to any real session or trading system.
   </footer>
+</div>
+
+<div id="helpOverlay" class="overlay" hidden>
+  <div class="overlayCard">
+    <h2>HOW TO PLAY</h2>
+    <p>Each round you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set a <b>STOP</b> and a <b>LIMIT</b> &mdash; both at least 3 ticks from entry. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you. Clear an obstacle for profit, miss it and it costs you. Bank your LIMIT and the run continues, a little harder. Hit your STOP and the run is over.</p>
+    <div class="kbrow"><kbd>&larr;</kbd><kbd>&rarr;</kbd> <span>run</span></div>
+    <div class="kbrow"><kbd>&uarr;</kbd> <span>jump</span></div>
+    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor (while setting stop/limit)</span></div>
+    <div class="kbrow"><kbd>SPACE</kbd> <span>confirm stop, then confirm limit</span></div>
+    <div class="kbrow"><kbd>R</kbd> <span>start a new run (resets score)</span></div>
+    <p style="margin-top:10px;">On a touch device, the same actions are mirrored by the on-screen buttons at the bottom of the screen.</p>
+    <div class="lesson">The stop defines the loss before the round even starts. The tape doesn't know, and doesn't care, which side you took.</div>
+    <button class="close" id="helpClose" type="button">Close</button>
+  </div>
+</div>
+
+<div id="gameOverOverlay" class="overlay" hidden>
+  <div class="overlayCard">
+    <h2>RUN OVER</h2>
+    <div class="goScoreLine" id="goScore">0</div>
+    <p style="margin-top:-4px;">Rounds banked: <span id="goRounds">0</span></p>
+    <p class="goMessage" id="goMessage"></p>
+    <div class="goForm">
+      <label for="initialsInput">INITIALS</label>
+      <input id="initialsInput" maxlength="3" autocomplete="off" spellcheck="false" value="">
+    </div>
+    <div class="goActions">
+      <button id="goSubmit" type="button">Submit score</button>
+      <button id="goPlayAgain" class="ghost" type="button">Play again</button>
+    </div>
+    <div class="lbHead"><h3>LEADERBOARD</h3><span id="lbSource"></span></div>
+    <ul id="lbList"></ul>
+  </div>
+</div>
+
+<div id="touchControls" class="touchControls" aria-hidden="true">
+  <button type="button" class="touchBtn" data-action="left" aria-label="Run left">&larr;</button>
+  <button type="button" class="touchBtn" data-action="right" aria-label="Run right">&rarr;</button>
+  <button type="button" class="touchBtn" data-action="jump" aria-label="Jump">JUMP</button>
+  <button type="button" class="touchBtn" data-action="climbUp" aria-label="Climb ladder up">&uarr; LADDER</button>
+  <button type="button" class="touchBtn" data-action="climbDown" aria-label="Climb ladder down">&darr; LADDER</button>
+  <button type="button" class="touchBtn" data-action="confirm" aria-label="Confirm placement">SET</button>
+  <button type="button" class="touchBtn" data-action="restart" aria-label="New run">RESTART</button>
 </div>
 
 <script>
 (function(){
   "use strict";
 
-  function rand(){ return Math.random(); }
   function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  // Seeded PRNG so each round's terrain/order-book is reproducible from its seed
+  // (procedural, not truly random) — used everywhere gameplay content is generated.
+  function mulberry32(seed){
+    return function(){
+      seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  var rand = mulberry32(Date.now() & 0xffffffff);
 
   // -------------------------------------------------------------- SOUND FX
   var SoundFX = (function(){
@@ -275,6 +409,8 @@
       src.start(t0); src.stop(t0+dur+0.02);
     }
 
+    var lastPnlTickAt = 0;
+
     return {
       isEnabled: function(){ return enabled; },
       setEnabled: function(v){
@@ -295,6 +431,36 @@
           })(notes[i], t);
           t += 70;
         }
+      },
+      // position locked in: two-note ascending confirm
+      positionLocked: function(){
+        tone(440, 0.07, {type:"square", gain:0.1});
+        setTimeout(function(){ tone(660, 0.1, {type:"square", gain:0.12}); }, 75);
+      },
+      // ongoing PnL drift, rate-limited so a run of small ticks doesn't turn into noise
+      pnlTick: function(sign){
+        var c = getCtx();
+        var now = c ? c.currentTime : 0;
+        if (now - lastPnlTickAt < 0.09) return;
+        lastPnlTickAt = now;
+        tone(sign > 0 ? 780 : 260, 0.035, {type:"triangle", gain:0.05});
+      },
+      obstacleClear: function(){
+        tone(700, 0.05, {type:"triangle", gain:0.1});
+        setTimeout(function(){ tone(1000, 0.07, {type:"triangle", gain:0.11}); }, 50);
+      },
+      roundWin: function(){
+        var notes = [660, 880, 1100, 1320], t = 0;
+        for (var i=0;i<notes.length;i++){
+          (function(freq, delay){
+            setTimeout(function(){ tone(freq, 0.16, {type:"square", gain:0.13}); }, delay);
+          })(notes[i], t);
+          t += 90;
+        }
+      },
+      stoppedOut: function(){
+        noiseBurst(0.22, {cutoff:220, gain:0.22});
+        tone(220, 0.35, {type:"sawtooth", slideTo:60, gain:0.14});
       }
     };
   })();
@@ -311,17 +477,43 @@
     refreshSoundBtn();
   });
 
+  // ------------------------------------------------------------- GAME STATE
+  var MIN_TICKS = 3;                 // minimum stop/limit distance from entry — trivial risk/reward floor
+  var MIN_OBSTACLE_GAP_COLS = 5;     // no two jump-obstacles closer than this, at any difficulty
+  var DEATH_MESSAGES = [
+    "The stop didn't care how good the setup looked.",
+    "Risk was defined the moment you set it, not when it happened.",
+    "The tape never knew which side you took.",
+    "That's what the stop is for."
+  ];
+
+  var phase = "setup";          // setup -> running -> roundwin|gameover
+  var direction = "LONG";       // this round's assigned side
+  var round = 1, score = 0;
+  var placementStep = "stop";   // "stop" | "limit"
+  var stopIdx = null, limitIdx = null, stopTicks = null, limitTicks = null;
+  var pnlTicks = 0;
+  var currentSeed = 0;
+  var banner = null;            // {text, color, until}
+  var helpOpen = false;
+
+  function resetRun(){
+    round = 1; score = 0;
+    document.getElementById("gameOverOverlay").hidden = true;
+    document.getElementById("goSubmit").disabled = false;
+    newRound();
+  }
+
   // ---------------------------------------------------------------- TERRAIN
   var tCanvas = document.getElementById("terrainCanvas");
   var tSurf = setupCanvas(tCanvas);
-  var tBarEl = document.getElementById("tBar");
-  var tOhlcEl = document.getElementById("tOhlc");
 
   function setupCanvas(cv){
+    // Backing-store resolution only — display size stays governed by the
+    // stylesheet's width:100%/height:auto so the canvas actually shrinks on
+    // narrow viewports instead of forcing a fixed-pixel minimum layout width.
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var cssW = cv.width, cssH = cv.height;
-    cv.style.width = cssW + "px";
-    cv.style.height = cssH + "px";
     cv.width = Math.round(cssW * dpr);
     cv.height = Math.round(cssH * dpr);
     var ctx = cv.getContext("2d");
@@ -332,13 +524,26 @@
   var COLW = 24, N_BARS = 420, MAXH = 230, BASE_MARGIN = 26;
   var GRAVITY = 1500, JUMP_V = -580, MOVE_SPEED = 210;
   var PLAYER_W = 12, PLAYER_H = 18;
+  // Jump forgiveness: obstacle hitboxes are inset from their visual bounds so a
+  // near-miss jump still reads as cleared — the physics arc itself is untouched.
+  var HIT_INSET_X = 3, HIT_INSET_TOP = 6;
 
-  var bars, player, keysHeld = {}, jumpQueued = false, wasBlocked = false;
+  var bars = null, player, keysHeld = {}, jumpQueued = false;
   var basePrice = 100 + Math.floor(rand()*40);
+  var lastCam = 0, lastIdx = 0;
+
+  function obstacleThreshold(){
+    // Difficulty ramp: later rounds pack obstacles closer together by lowering
+    // the body-size cutoff for what counts as a jump obstacle (not by touching
+    // gravity/jump/move speed, which stay exactly as tuned).
+    return Math.max(0.028, 0.05 - 0.0015*(round-1));
+  }
 
   function genBars(){
     bars = [];
     var level = 0.5;
+    var threshold = obstacleThreshold();
+    var lastObstacleI = -999;
     for (var i=0;i<N_BARS;i++){
       var open = level;
       var step = (rand()-0.5)*0.085;
@@ -349,22 +554,29 @@
       var bottom = Math.min(open, close);
       var wickHi = Math.min(0.99, top + rand()*0.055);
       var wickLo = Math.max(0.01, bottom - rand()*0.05);
-      bars.push({open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo, bull: close>=open});
+      var bull = close >= open;
+      var bodyMag = top - bottom;
+      var favorable = (direction === "LONG") ? bull : !bull;
+      var isObstacle = !favorable && bodyMag >= threshold;
+      if (isObstacle){
+        if (i - lastObstacleI < MIN_OBSTACLE_GAP_COLS) isObstacle = false;
+        else lastObstacleI = i;
+      }
+      var hurdlePx = isObstacle ? clamp(bodyMag*MAXH, 18, 85) : 0;
+      bars.push({
+        open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo,
+        bull:bull, favorable:favorable, isObstacle:isObstacle, hurdlePx:hurdlePx,
+        sampled: (i % 3 === 0), resolved:false
+      });
     }
   }
 
-  function groundY(i){
-    i = clamp(i,0,N_BARS-1);
-    return tSurf.h - BASE_MARGIN - bars[i].top*MAXH;
-  }
-
-  function resetTerrain(){
-    genBars();
-    player = { x: COLW*1.5, y: groundY(1)-PLAYER_H, vx:0, vy:0, onGround:true };
-    wasBlocked = false;
-  }
-
+  function baselineY(){ return tSurf.h - BASE_MARGIN; }
   function terrainIndexAt(worldX){ return clamp(Math.floor(worldX/COLW), 0, N_BARS-1); }
+
+  function resetTerrainPlayer(){
+    player = { x: COLW*1.5, y: baselineY()-PLAYER_H, vx:0, vy:0, onGround:true };
+  }
 
   function updateTerrain(dt){
     var wasOnGround = player.onGround;
@@ -383,28 +595,13 @@
 
     player.vy += GRAVITY*dt;
 
-    var proposedX = clamp(player.x + player.vx*dt, COLW*0.5, (N_BARS-1)*COLW - COLW*0.5);
-    var curFeet = player.y + PLAYER_H;
-    var targetIdx = terrainIndexAt(proposedX);
-    var targetGround = groundY(targetIdx);
-
-    // block horizontal motion into a cliff face taller than the player can currently clear
-    var STEP_TOLERANCE = 46;
-    if (targetGround < curFeet - STEP_TOLERANCE) {
-      // wall ahead: only allow if already rising above it
-      if (player.vx !== 0 && !wasBlocked) SoundFX.bump();
-      wasBlocked = true;
-    } else {
-      player.x = proposedX;
-      wasBlocked = false;
-    }
-
+    var maxX = (N_BARS-1)*COLW - COLW*0.5;
+    player.x = clamp(player.x + player.vx*dt, COLW*0.5, maxX);
     player.y += player.vy*dt;
 
-    var idx = terrainIndexAt(player.x);
-    var gY = groundY(idx);
-    if (player.y + PLAYER_H >= gY && player.vy >= 0){
-      player.y = gY - PLAYER_H;
+    var baseline = baselineY();
+    if (player.y + PLAYER_H >= baseline && player.vy >= 0){
+      player.y = baseline - PLAYER_H;
       player.vy = 0;
       player.onGround = true;
       if (!wasOnGround) SoundFX.land();
@@ -412,8 +609,75 @@
       player.onGround = false;
     }
 
+    var idx = terrainIndexAt(player.x);
     var cam = clamp(player.x - tSurf.w/2, 0, Math.max(0,(N_BARS-1)*COLW - tSurf.w));
     return {idx:idx, cam:cam};
+  }
+
+  function playerObstacleOverlap(b, i){
+    var baseline = baselineY();
+    var hx0 = i*COLW + HIT_INSET_X, hx1 = i*COLW + COLW - HIT_INSET_X;
+    var hTop = baseline - b.hurdlePx + HIT_INSET_TOP, hBot = baseline;
+    var px0 = player.x - PLAYER_W/2 + 2, px1 = player.x + PLAYER_W/2 - 2;
+    var py0 = player.y + 2, py1 = player.y + PLAYER_H;
+    return px1 > hx0 && px0 < hx1 && py1 > hTop && py0 < hBot;
+  }
+
+  function resolveObstacles(){
+    var centerIdx = terrainIndexAt(player.x);
+    var i0 = Math.max(0, centerIdx-2), i1 = Math.min(N_BARS-1, centerIdx+2);
+    for (var i=i0;i<=i1;i++){
+      if (phase !== "running") break; // round already resolved this frame — don't overshoot the threshold
+      var b = bars[i];
+      if (!b || b.resolved) continue;
+      if (b.isObstacle && playerObstacleOverlap(b,i)){
+        resolveBar(b, "hit");
+        continue;
+      }
+      if ((player.x - PLAYER_W/2) > (i+1)*COLW){
+        if (b.isObstacle) resolveBar(b, "clear");
+        else if (b.sampled) resolveBar(b, b.favorable ? "favorable" : "rough");
+        else b.resolved = true; // unsampled ambient bar: no PnL effect, just scenery
+      }
+    }
+  }
+
+  // Score/PnL model: favorable ground drifts PnL +1, sub-threshold adverse
+  // candles ("rough patches") cost -1 without needing a jump, and the real
+  // obstacles swing it hard: +2 cleared, -3 hit. Only every 3rd non-obstacle
+  // bar is sampled for ambient PnL so a round has a legible pace instead of
+  // ticking on every single candle.
+  function resolveBar(b, kind){
+    b.resolved = true;
+    var delta = 0;
+    if (kind === "hit"){ delta = -3; SoundFX.bump(); }
+    else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); }
+    else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
+    else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); }
+    pnlTicks += delta;
+    checkRoundOutcome();
+  }
+
+  function checkRoundOutcome(){
+    if (phase !== "running") return;
+    if (pnlTicks >= limitTicks) winRound();
+    else if (pnlTicks <= -stopTicks) loseRun();
+  }
+
+  function winRound(){
+    phase = "roundwin";
+    score += limitTicks;
+    SoundFX.roundWin();
+    banner = { text: "LIMIT HIT +" + limitTicks, color: "#6ef2a0", until: performance.now()+1100 };
+    setTimeout(function(){ round += 1; newRound(); }, 1150);
+  }
+
+  function loseRun(){
+    phase = "gameover";
+    SoundFX.stoppedOut();
+    banner = { text: "STOPPED OUT", color: "#ff6b5c", until: performance.now()+1000 };
+    var msg = DEATH_MESSAGES[Math.floor(Math.random()*DEATH_MESSAGES.length)];
+    setTimeout(function(){ showGameOver(msg); }, 1050);
   }
 
   function drawTerrain(cam, idx){
@@ -426,36 +690,45 @@
     ctx.lineWidth = 1;
     for (var gx=0; gx<w; gx+=40){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
 
-    var baseline = h - BASE_MARGIN;
+    var baseline = baselineY();
     ctx.strokeStyle = "#2c5b3f";
     ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
 
-    var startI = Math.max(0, Math.floor(cam/COLW)-1);
-    var endI = Math.min(N_BARS-1, Math.ceil((cam+w)/COLW)+1);
-    for (var i=startI;i<=endI;i++){
-      var b = bars[i];
-      var sx = i*COLW - cam;
-      var topY = h - BASE_MARGIN - b.top*MAXH;
-      var botY = h - BASE_MARGIN - b.bottom*MAXH;
-      var wHiY = h - BASE_MARGIN - b.wickHi*MAXH;
-      var wLoY = h - BASE_MARGIN - b.wickLo*MAXH;
-      var col = b.bull ? "#6ef2a0" : "#ff6b5c";
+    if (bars){
+      var startI = Math.max(0, Math.floor(cam/COLW)-1);
+      var endI = Math.min(N_BARS-1, Math.ceil((cam+w)/COLW)+1);
+      for (var i=startI;i<=endI;i++){
+        var b = bars[i];
+        var sx = i*COLW - cam;
+        var col = b.bull ? "#6ef2a0" : "#ff6b5c";
+        var bodyPx = clamp((b.top-b.bottom)*MAXH, 4, 85);
+        var topY = baseline - bodyPx;
 
-      ctx.strokeStyle = col;
-      ctx.globalAlpha = .55;
-      ctx.beginPath();
-      ctx.moveTo(sx+COLW/2, wHiY);
-      ctx.lineTo(sx+COLW/2, wLoY);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+        ctx.globalAlpha = b.isObstacle ? 1 : .45;
+        ctx.fillStyle = col;
+        ctx.fillRect(sx+3, topY, COLW-6, bodyPx);
+        if (b.isObstacle){
+          ctx.strokeStyle = "#fff";
+          ctx.globalAlpha = .6;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(sx+3, topY, COLW-6, bodyPx);
+        }
+        ctx.globalAlpha = b.isObstacle ? .7 : .3;
+        ctx.strokeStyle = col;
+        var wickPx = bodyPx + (b.wickHi-b.top)*MAXH*0.6;
+        ctx.beginPath();
+        ctx.moveTo(sx+COLW/2, topY);
+        ctx.lineTo(sx+COLW/2, baseline-wickPx);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
 
-      ctx.fillStyle = col;
-      ctx.fillRect(sx+3, topY, COLW-6, Math.max(2, botY-topY));
-      ctx.fillRect(sx+3, botY, COLW-6, Math.max(1, baseline-botY));
-      ctx.globalAlpha = i===idx ? 1 : .38;
-      ctx.fillStyle = "#0d1611";
-      ctx.fillRect(sx+3, topY, COLW-6, 2);
-      ctx.globalAlpha = 1;
+        if (b.resolved){
+          ctx.globalAlpha = .35;
+          ctx.fillStyle = "#0d1611";
+          ctx.fillRect(sx, 0, COLW, h);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
 
     var px = player.x - cam - PLAYER_W/2;
@@ -464,17 +737,32 @@
     ctx.fillStyle = "#d8f5e2";
     ctx.fillRect(px, player.y, PLAYER_W, PLAYER_H);
     ctx.shadowBlur = 0;
+
+    if (banner && performance.now() < banner.until){
+      ctx.font = "bold 30px 'VT323', monospace";
+      ctx.fillStyle = banner.color;
+      ctx.textAlign = "center";
+      ctx.shadowColor = banner.color;
+      ctx.shadowBlur = 12;
+      ctx.fillText(banner.text, w/2, h/2);
+      ctx.shadowBlur = 0;
+      ctx.textAlign = "left";
+    }
   }
 
-  function fmtPrice(v){ return (basePrice + v*46).toFixed(2); }
-
-  function updateTerrainHud(idx){
-    var b = bars[idx];
-    tBarEl.textContent = idx + " / " + (N_BARS-1);
-    var cls = b.bull ? "up" : "down";
-    tOhlcEl.innerHTML = '<span class="tag">O/H/L/C</span> ' +
-      fmtPrice(b.open) + ' / ' + fmtPrice(b.wickHi) + ' / ' + fmtPrice(b.wickLo) + ' / ' +
-      '<span class="'+cls+'">' + fmtPrice(b.close) + (b.bull? ' &#9650;':' &#9660;') + '</span>';
+  function updateHud(){
+    var posEl = document.getElementById("hudPosition");
+    var pnlEl = document.getElementById("hudPnl");
+    var toStopEl = document.getElementById("hudToStop");
+    var toLimitEl = document.getElementById("hudToLimit");
+    posEl.textContent = direction;
+    posEl.className = direction === "LONG" ? "up" : "down";
+    pnlEl.textContent = (pnlTicks >= 0 ? "+" : "") + pnlTicks;
+    pnlEl.className = pnlTicks >= 0 ? "up" : "down";
+    toStopEl.textContent = stopTicks != null ? Math.max(0, stopTicks + pnlTicks) : "—";
+    toLimitEl.textContent = limitTicks != null ? Math.max(0, limitTicks - pnlTicks) : "—";
+    document.getElementById("roundVal").textContent = round;
+    document.getElementById("scoreVal").textContent = score;
   }
 
   // ----------------------------------------------------------------- LADDER
@@ -483,7 +771,7 @@
   var lLevelEl = document.getElementById("lLevel");
 
   var BID_N = 8, ASK_N = 8, TOTAL = BID_N+ASK_N;
-  var levels, ladderPlayer;
+  var levels, ladderPlayer = { idx: BID_N-1 };
 
   function genLevels(){
     levels = [];
@@ -498,7 +786,74 @@
       if (rand()<0.18) size2 += 40;
       levels.push({ side:"ask", size:size2, price: basePrice + tick*(j+1) });
     }
-    ladderPlayer = { idx: BID_N-1 };
+  }
+
+  // Ticks map directly onto ladder rows: row BID_N-1 (closest bid) is 1 tick
+  // below entry, row BID_N (closest ask) is 1 tick above. Stop/limit placement
+  // reuses this scale so the HUD's "ticks" and the ladder's rows always agree.
+  function idxToTicks(idx){ return idx < BID_N ? (BID_N-idx) : (idx-BID_N+1); }
+  function ticksToIdx(side, ticks){ return side === "bid" ? (BID_N-ticks) : (BID_N-1+ticks); }
+
+  function sideForStep(step){
+    var isStop = step === "stop";
+    if (direction === "LONG") return isStop ? "bid" : "ask";
+    return isStop ? "ask" : "bid";
+  }
+  function rangeForSide(side){
+    return side === "bid" ? {minIdx:0, maxIdx:BID_N-MIN_TICKS} : {minIdx:BID_N+MIN_TICKS-1, maxIdx:TOTAL-1};
+  }
+
+  // Shared by keyboard (W/S) and touch (climb up/down buttons) so both drive
+  // the exact same clamped range + sound cue.
+  function doLadderMove(delta){
+    if (phase !== "setup") return;
+    var side = sideForStep(placementStep);
+    var range = rangeForSide(side);
+    var prevIdx = ladderPlayer.idx;
+    ladderPlayer.idx = clamp(ladderPlayer.idx+delta, range.minIdx, range.maxIdx);
+    if (ladderPlayer.idx !== prevIdx) SoundFX.climbStep();
+  }
+
+  function confirmPlacement(){
+    if (placementStep === "stop"){
+      stopIdx = ladderPlayer.idx;
+      stopTicks = idxToTicks(stopIdx);
+      placementStep = "limit";
+      var side = sideForStep("limit");
+      ladderPlayer.idx = ticksToIdx(side, MIN_TICKS);
+      SoundFX.spreadCross();
+      updateHud();
+    } else {
+      limitIdx = ladderPlayer.idx;
+      limitTicks = idxToTicks(limitIdx);
+      lockInPosition();
+    }
+  }
+
+  function lockInPosition(){
+    currentSeed = Math.floor(Math.random()*1e9);
+    rand = mulberry32(currentSeed);
+    genBars();
+    resetTerrainPlayer();
+    pnlTicks = 0;
+    phase = "running";
+    SoundFX.positionLocked();
+    updateHud();
+  }
+
+  function newRound(){
+    direction = Math.random() < 0.5 ? "LONG" : "SHORT";
+    bars = null;
+    pnlTicks = 0;
+    stopIdx = null; limitIdx = null; stopTicks = null; limitTicks = null;
+    placementStep = "stop";
+    genLevels();
+    var side = sideForStep("stop");
+    ladderPlayer.idx = ticksToIdx(side, MIN_TICKS);
+    resetTerrainPlayer();
+    phase = "setup";
+    banner = null;
+    updateHud();
   }
 
   function ladderRowY(rowIndex){
@@ -520,14 +875,21 @@
     var maxSize = 0;
     for (var k=0;k<levels.length;k++) maxSize = Math.max(maxSize, levels[k].size);
 
+    var inSetup = phase === "setup";
+    var activeSide = inSetup ? sideForStep(placementStep) : null;
+    var activeRange = inSetup ? rangeForSide(activeSide) : null;
+
     for (var i=0;i<levels.length;i++){
       var lv = levels[i];
       var row = ladderRowY(i);
       var barW = 30 + (w-90) * (lv.size/maxSize);
       var x = (w-barW)/2;
       var col = lv.side==="bid" ? "#6ef2a0" : "#ff6b5c";
+      var rowSide = i<BID_N ? "bid" : "ask";
+      var isValidNow = inSetup && rowSide===activeSide && i>=activeRange.minIdx && i<=activeRange.maxIdx;
+      var dim = inSetup && !isValidNow;
 
-      ctx.globalAlpha = i===ladderPlayer.idx ? 1 : .68;
+      ctx.globalAlpha = dim ? .22 : (i===ladderPlayer.idx && inSetup ? 1 : .68);
       ctx.fillStyle = col;
       ctx.fillRect(x, row.y+3, barW, row.h-6);
       ctx.globalAlpha = 1;
@@ -541,6 +903,17 @@
       ctx.textAlign = "right";
       ctx.fillText(lv.price.toFixed(2), w-8, row.y+row.h/2);
       ctx.textAlign = "left";
+
+      if (!inSetup && stopIdx===i){
+        ctx.fillStyle = "#ff6b5c";
+        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+        ctx.fillText("STOP", x+8, row.y+row.h/2-9);
+      }
+      if (!inSetup && limitIdx===i){
+        ctx.fillStyle = "#6ef2a0";
+        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+        ctx.fillText("LIMIT", x+8, row.y+row.h/2-9);
+      }
     }
 
     var mid = (ladderRowY(BID_N-1).y + ladderRowY(BID_N).y + ladderRowY(BID_N).h) / 2;
@@ -550,62 +923,187 @@
     ctx.setLineDash([]);
     ctx.fillStyle = "#7fa38c";
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.fillText("SPREAD", 8, mid-8);
+    ctx.fillText("ENTRY", 8, mid-8);
 
-    var pr = ladderRowY(ladderPlayer.idx);
-    ctx.shadowColor = "#d8f5e2";
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "#d8f5e2";
-    ctx.fillRect(w/2-6, pr.y+pr.h/2-6, 12, 12);
-    ctx.shadowBlur = 0;
+    if (inSetup){
+      var pr = ladderRowY(ladderPlayer.idx);
+      ctx.shadowColor = "#d8f5e2";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#d8f5e2";
+      ctx.fillRect(w/2-6, pr.y+pr.h/2-6, 12, 12);
+      ctx.shadowBlur = 0;
+    }
   }
 
   function updateLadderHud(){
-    var lv = levels[ladderPlayer.idx];
-    var cls = lv.side==="bid" ? "up" : "down";
-    lLevelEl.innerHTML = '<span class="'+cls+'">' + lv.side.toUpperCase() + '</span> $' + lv.price.toFixed(2) + ' &times; ' + lv.size;
+    if (phase === "setup"){
+      var stepLabel = placementStep === "stop" ? "SET STOP" : "SET LIMIT";
+      lLevelEl.innerHTML = "<b>" + stepLabel + "</b> &mdash; " + idxToTicks(ladderPlayer.idx) + " ticks";
+    } else if (stopTicks != null){
+      lLevelEl.innerHTML = '<span class="down">STOP -' + stopTicks + '</span> &middot; <span class="up">LIMIT +' + limitTicks + '</span>';
+    }
   }
 
-  function crossedSpread(a, b){
-    var loSide = Math.min(a,b), hiSide = Math.max(a,b);
-    return loSide <= BID_N-1 && hiSide >= BID_N;
+  // ------------------------------------------------------------ LEADERBOARD
+  var LB_KEY = "tapeAndLadderLocalScores";
+  function loadLocalScores(){
+    try { return JSON.parse(localStorage.getItem(LB_KEY) || "[]"); } catch(e){ return []; }
+  }
+  function saveLocalScore(initials, finalScore){
+    var list = loadLocalScores();
+    list.push({ initials:initials, score:finalScore, created_at:new Date().toISOString() });
+    list.sort(function(a,b){ return b.score-a.score; });
+    list = list.slice(0,10);
+    try { localStorage.setItem(LB_KEY, JSON.stringify(list)); } catch(e){}
+    return list;
+  }
+  function apiBase(){
+    var u = window.LEADERBOARD_API_URL;
+    return u ? u.replace(/\/$/,"") : null;
+  }
+  function submitScore(initials, finalScore){
+    var base = apiBase();
+    if (!base) return Promise.resolve(false);
+    return fetch(base + "/api/scores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ initials:initials, score:finalScore })
+    }).then(function(r){ return r.ok; }).catch(function(){ return false; });
+  }
+  function fetchLeaderboard(){
+    var base = apiBase();
+    if (!base) return Promise.resolve(null);
+    return fetch(base + "/api/scores?limit=10")
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ return (d && d.ok && d.scores) ? d.scores : null; })
+      .catch(function(){ return null; });
+  }
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function renderLeaderboard(list, isLocal){
+    var el = document.getElementById("lbList");
+    if (!list || !list.length){ el.innerHTML = '<li class="lbEmpty">No scores yet.</li>'; return; }
+    el.innerHTML = list.map(function(r,i){
+      return '<li><span class="lbRank">'+(i+1)+'</span><span class="lbInit">'+escapeHtml(r.initials)+'</span><span class="lbScore">'+r.score+'</span></li>';
+    }).join("");
+    document.getElementById("lbSource").textContent = isLocal ? "LOCAL (offline)" : "GLOBAL";
   }
 
-  function handleLadderMove(prevIdx, newIdx){
-    if (crossedSpread(prevIdx, newIdx)) SoundFX.spreadCross();
-    else SoundFX.climbStep();
+  function showGameOver(msg){
+    document.getElementById("goScore").textContent = score;
+    document.getElementById("goRounds").textContent = round-1;
+    document.getElementById("goMessage").textContent = msg;
+    document.getElementById("lbSource").textContent = "";
+    document.getElementById("lbList").innerHTML = "";
+    document.getElementById("gameOverOverlay").hidden = false;
+    var input = document.getElementById("initialsInput");
+    input.value = "";
+    input.focus();
   }
 
-  // ------------------------------------------------------------------ LOOP
-  function resetAll(){
-    resetTerrain();
-    genLevels();
+  document.getElementById("goSubmit").addEventListener("click", function(){
+    var input = document.getElementById("initialsInput");
+    var initials = (input.value || "").trim().toUpperCase().slice(0,3) || "---";
+    saveLocalScore(initials, score);
+    submitScore(initials, score).then(function(){
+      return fetchLeaderboard();
+    }).then(function(remote){
+      if (remote) renderLeaderboard(remote, false);
+      else renderLeaderboard(loadLocalScores(), true);
+    });
+    document.getElementById("goSubmit").disabled = true;
+  });
+  document.getElementById("goPlayAgain").addEventListener("click", function(){
+    resetRun();
+  });
+
+  // -------------------------------------------------------------- HELP UI
+  var helpBtn = document.getElementById("helpBtn");
+  function setHelpOpen(v){
+    helpOpen = v;
+    document.getElementById("helpOverlay").hidden = !v;
+    helpBtn.setAttribute("aria-pressed", v ? "true" : "false");
   }
-  resetAll();
+  helpBtn.addEventListener("click", function(){ setHelpOpen(!helpOpen); });
+  document.getElementById("helpClose").addEventListener("click", function(){ setHelpOpen(false); });
+
+  // ------------------------------------------------------------------ INPUT
+  document.getElementById("regen").addEventListener("click", resetRun);
 
   window.addEventListener("keydown", function(e){
-    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].indexOf(e.key)!==-1) e.preventDefault();
+    var typing = document.activeElement && document.activeElement.id === "initialsInput";
+    if (!typing && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].indexOf(e.key)!==-1) e.preventDefault();
+
+    if (typing){
+      if (e.key === "Enter") document.getElementById("goSubmit").click();
+      return;
+    }
+    if (e.key === "Escape" && helpOpen){ setHelpOpen(false); return; }
+
     keysHeld[e.key] = true;
+    if (e.key === "h" || e.key === "H"){ setHelpOpen(!helpOpen); return; }
+    if (e.key === "r" || e.key === "R"){ resetRun(); return; }
     if (e.repeat) return;
-    if (e.key==="ArrowUp") jumpQueued = true;
-    var prevLadderIdx = ladderPlayer.idx;
-    if (e.key==="w" || e.key==="W") ladderPlayer.idx = clamp(ladderPlayer.idx+1, 0, TOTAL-1);
-    if (e.key==="s" || e.key==="S") ladderPlayer.idx = clamp(ladderPlayer.idx-1, 0, TOTAL-1);
-    if (ladderPlayer.idx !== prevLadderIdx) handleLadderMove(prevLadderIdx, ladderPlayer.idx);
-    if (e.key==="r" || e.key==="R") resetAll();
+    if (e.key === "ArrowUp") jumpQueued = true;
+
+    if (phase === "setup"){
+      if (e.key === "w" || e.key === "W") doLadderMove(1);
+      if (e.key === "s" || e.key === "S") doLadderMove(-1);
+      if (e.key === " " || e.key === "Enter") confirmPlacement();
+    }
   }, {passive:false});
   window.addEventListener("keyup", function(e){ keysHeld[e.key]=false; });
-  document.getElementById("regen").addEventListener("click", resetAll);
+
+  // -------------------------------------------------------------- TOUCH UI
+  var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  var touchControls = document.getElementById("touchControls");
+  if (isTouchDevice){
+    touchControls.classList.add("active");
+    touchControls.setAttribute("aria-hidden", "false");
+    document.body.classList.add("touchMode");
+  }
+
+  function bindHold(el, onStart, onEnd){
+    el.addEventListener("pointerdown", function(e){ e.preventDefault(); onStart(); }, {passive:false});
+    ["pointerup","pointercancel","pointerleave"].forEach(function(ev){
+      el.addEventListener(ev, function(){ onEnd(); });
+    });
+  }
+  function bindTap(el, onTap){
+    el.addEventListener("pointerdown", function(e){ e.preventDefault(); onTap(); }, {passive:false});
+  }
+
+  Array.prototype.forEach.call(touchControls.querySelectorAll(".touchBtn"), function(btnEl){
+    var action = btnEl.getAttribute("data-action");
+    if (action === "left") bindHold(btnEl, function(){ keysHeld["ArrowLeft"]=true; }, function(){ keysHeld["ArrowLeft"]=false; });
+    else if (action === "right") bindHold(btnEl, function(){ keysHeld["ArrowRight"]=true; }, function(){ keysHeld["ArrowRight"]=false; });
+    else if (action === "jump") bindTap(btnEl, function(){ jumpQueued = true; });
+    else if (action === "climbUp") bindTap(btnEl, function(){ doLadderMove(1); });
+    else if (action === "climbDown") bindTap(btnEl, function(){ doLadderMove(-1); });
+    else if (action === "confirm") bindTap(btnEl, function(){ if (phase === "setup") confirmPlacement(); });
+    else if (action === "restart") bindTap(btnEl, function(){ resetRun(); });
+  });
+
+  // ------------------------------------------------------------------ LOOP
+  newRound();
 
   var last = performance.now();
   function frame(now){
     var dt = Math.min(0.033, (now-last)/1000);
     last = now;
-    var t = updateTerrain(dt);
-    drawTerrain(t.cam, t.idx);
-    updateTerrainHud(t.idx);
+    if (!helpOpen && phase !== "gameover"){
+      var t = updateTerrain(dt);
+      lastCam = t.cam; lastIdx = t.idx;
+      if (phase === "running") resolveObstacles();
+    }
+    drawTerrain(lastCam, lastIdx);
     drawLadder();
     updateLadderHud();
+    updateHud();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
