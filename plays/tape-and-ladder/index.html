@@ -463,6 +463,15 @@
         noiseBurst(0.07, {cutoff:500, gain:0.22});
         tone(160, 0.1, {type:"square", gain:0.12});
       },
+      // M5b: tunnel graze — deliberately the softest, briefest hazard cue in the
+      // set: no tone/buzz component at all, just a short bright noise "brush."
+      // Needs to read as clearly different in *kind* from an instant hit (per the
+      // ticket), not just quieter — every other hit cue pairs a noise burst with a
+      // pitched tone (a "thud"/"zap"); this is noise only, matching "you clipped
+      // the edge" rather than "you got hit."
+      tunnelGraze: function(){
+        noiseBurst(0.04, {cutoff:2200, gain:0.12});
+      },
       spreadCross: function(){
         if (!enabled) return;
         var notes = [660, 880, 1320];
@@ -618,10 +627,21 @@
   var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;
   var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
 
+  // M5b hazard 2: moving-average tunnel. Not direction-conditional (unlike every
+  // other hazard/candle) — a precision/restraint test, not a reflex-jump one, per
+  // the ticket. TUNNEL_WIDTH_PX is sized to stay safely inside the bar-generation
+  // lookahead available at spawn time (~740px of margin between the hazard-spawn
+  // frontier and the bar-generation frontier — see spawnTunnel()'s comment) so its
+  // MA sampling never needs a not-yet-generated bar.
+  var TUNNEL_FAST_WINDOW = 5, TUNNEL_SLOW_WINDOW = 20; // bars
+  var TUNNEL_GAP_WIDE_PX = 80, TUNNEL_GAP_NARROW_PX = 20;
+  var TUNNEL_WIDTH_PX = 640;
+  var TUNNEL_GRAZE_PENALTY = 1, TUNNEL_GRAZE_COOLDOWN_MS = 180;
+
   // M5b: which hazard types the streaming spawner can pick from — extend this list
   // (not ensureHazardsSpawned()'s loop shape) as each new M5b type lands, per the
   // ticket's "reuse the pattern without restructuring it" instruction.
-  var HAZARD_TYPES = ["gannFan", "wall"];
+  var HAZARD_TYPES = ["gannFan", "wall", "tunnel"];
 
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
@@ -930,6 +950,106 @@
     hazard.hostile = (hazard.role === "resistance") ? (direction === "LONG") : (direction === "SHORT");
   }
 
+  // ------------------------------------------------------------ HAZARDS (M5b #2)
+  // Moving-average tunnel: a genuine trailing/lagging simple MA (average of the
+  // `windowBars` closes ending at `centerAbsIndex`, looking only backward — the
+  // same lag a real MA has), reused for both a fast and a slow window. Falls back
+  // to 0.5 (mid-range) for any missing bar so an edge-of-window lookup never
+  // breaks the calculation, same defensive spirit as barAt() returning null for
+  // an out-of-window index.
+  function computeMA(centerAbsIndex, windowBars){
+    var sum = 0, count = 0;
+    for (var k = centerAbsIndex - windowBars + 1; k <= centerAbsIndex; k++){
+      var b = barAt(k);
+      if (b){ sum += b.close; count++; }
+    }
+    return count > 0 ? sum/count : 0.5;
+  }
+
+  // Judgment call: the ticket asks for "two lagged/smoothed curves (fast+slow MA)"
+  // whose gap follows a specific designed shape (80px -> 20px -> 80px over a
+  // stretch) — a real fast/slow MA pair's natural divergence is data-dependent and
+  // can't be relied on to hit that exact shape from random-walk close data. So the
+  // tunnel's centerline genuinely IS the (fast+slow)/2 trailing MA of the bars'
+  // closes (real market-data lag/smoothing, giving it organic wiggle rather than a
+  // dead-straight line), but the tunnel's *width* is a scripted taper around that
+  // centerline (see tunnelHalfGapPx()) rather than the raw |fast-slow| spread —
+  // the taper is the actual hazard shape being tested, not a data artifact.
+  //
+  // Sampling the MA once at spawn time (rather than recomputing live from `bars`
+  // every frame) is deliberate, not just a perf shortcut: dropOldBars() keeps only
+  // a couple columns of `bars` behind the camera, but a trailing MA needs to look
+  // up to TUNNEL_SLOW_WINDOW columns *behind* whatever worldX it's evaluated at —
+  // by the time the player actually reaches the tunnel, those bars would already
+  // be dropped. Sampling at spawn (when the hazard's whole span, plus its
+  // lookback, is still within the freshly-generated window) bakes the curve into
+  // the hazard, like Gann fan's fixed pivot/slopes, immune to later drops.
+  function spawnTunnel(xStart){
+    var xEnd = xStart + TUNNEL_WIDTH_PX;
+    var endIdx = terrainIndexAt(xEnd);
+    // Defensive: guarantee every bar this tunnel's MA samples need is already
+    // generated+classified. TUNNEL_WIDTH_PX is sized to normally stay inside
+    // ensureBarsGenerated()'s existing lookahead for this frame's cam, but this
+    // makes that a guarantee rather than an assumption baked into a tuning
+    // constant — mirrors ensureBarsGenerated()/ensureBarsClassified()'s own loops.
+    while (barsGenIndex <= endIdx) genNextBar(obstacleThreshold());
+    while (barsClassifiedUpTo <= endIdx && barsClassifiedUpTo < barsGenIndex){
+      var relC = barsClassifiedUpTo - barsBaseIndex;
+      if (relC < 0 || relC >= bars.length) break;
+      classifyBar(bars[relC], barsClassifiedUpTo);
+      barsClassifiedUpTo++;
+    }
+    var startIdx = Math.max(0, terrainIndexAt(xStart) - TUNNEL_SLOW_WINDOW);
+    var samples = [];
+    for (var i = startIdx; i <= endIdx; i++){
+      var fast = computeMA(i, TUNNEL_FAST_WINDOW);
+      var slow = computeMA(i, TUNNEL_SLOW_WINDOW);
+      samples.push({ absIndex: i, closeY: (fast+slow)/2 });
+    }
+    hazards.push({
+      type: "tunnel", xStart: xStart, xEnd: xEnd,
+      samples: samples, lastGrazeAt: -Infinity
+    });
+  }
+
+  // Scripted symmetric taper, not derived from bar data (see spawnTunnel()'s
+  // comment): wide for the first/last fifth of the span, narrows linearly over
+  // the next fifth, holds narrow for the middle fifth, widens back over the next
+  // fifth. Produces exactly the "shrinks... then widens back out" shape the
+  // ticket asks for regardless of what the underlying tape did.
+  function tunnelHalfGapPx(hazard, worldX){
+    var t = clamp((worldX - hazard.xStart) / (hazard.xEnd - hazard.xStart), 0, 1);
+    var wide = TUNNEL_GAP_WIDE_PX/2, narrow = TUNNEL_GAP_NARROW_PX/2;
+    if (t < 0.2) return wide;
+    if (t < 0.4) return wide + (narrow-wide)*((t-0.2)/0.2);
+    if (t < 0.6) return narrow;
+    if (t < 0.8) return narrow + (wide-narrow)*((t-0.6)/0.2);
+    return wide;
+  }
+
+  // Interpolates the spawn-time-sampled MA centerline at an arbitrary world-x
+  // (samples are one per bar column — COLW apart — so this is a linear
+  // interpolation between the two bracketing columns, not a lookup table).
+  function tunnelCenterY(hazard, worldX){
+    var samples = hazard.samples;
+    if (samples.length === 0) return baselineY();
+    var idxF = worldX / COLW;
+    if (idxF <= samples[0].absIndex) return baselineY() - samples[0].closeY*MAXH;
+    var last = samples[samples.length-1];
+    if (idxF >= last.absIndex) return baselineY() - last.closeY*MAXH;
+    for (var i=0;i<samples.length-1;i++){
+      var a = samples[i], b = samples[i+1];
+      if (idxF >= a.absIndex && idxF <= b.absIndex){
+        var frac = (idxF - a.absIndex) / (b.absIndex - a.absIndex);
+        return baselineY() - (a.closeY + (b.closeY-a.closeY)*frac)*MAXH;
+      }
+    }
+    return baselineY() - last.closeY*MAXH;
+  }
+
+  function tunnelUpperY(hazard, worldX){ return tunnelCenterY(hazard, worldX) - tunnelHalfGapPx(hazard, worldX); }
+  function tunnelLowerY(hazard, worldX){ return tunnelCenterY(hazard, worldX) + tunnelHalfGapPx(hazard, worldX); }
+
   // Keeps the next hazard spawned ~HAZARD_SPAWN_AHEAD_PX past the camera's leading
   // edge, same "stay filled ahead of the frontier" shape as ensureBarsGenerated(),
   // decoupled onto its own world-pixel cadence and its own RNG draws (gap size).
@@ -940,6 +1060,7 @@
   function spawnHazardAt(worldX){
     var kind = HAZARD_TYPES[Math.floor(rand()*HAZARD_TYPES.length)];
     if (kind === "wall") spawnWall(worldX);
+    else if (kind === "tunnel") spawnTunnel(worldX);
     else spawnGannFan(worldX);
   }
 
@@ -978,11 +1099,15 @@
     var lockoutEnd = player.x + LADDER_FLIP_LOCKOUT_AHEAD*COLW;
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
-      // M5b: each type's own collidable band, not the generic xStart/xEnd —
-      // matches the pre-existing gannFan behavior (core band only; the cosmetic
-      // fade tail was never part of the lockout check) and gives wall an
-      // equivalently precise band (its xStart/xEnd already IS its full collidable
-      // span, unlike gannFan's).
+      // M5b: the tunnel isn't direction-conditional at all (see spawnTunnel()'s
+      // comment) — nothing to reclassify, so it's skipped before the band check
+      // below even bothers looking at fields it doesn't have.
+      if (hz.type === "tunnel") continue;
+      // Each type's own collidable band, not the generic xStart/xEnd — matches the
+      // pre-existing gannFan behavior (core band only; the cosmetic fade tail was
+      // never part of the lockout check) and gives wall an equivalently precise
+      // band (its xStart/xEnd already IS its full collidable span, unlike
+      // gannFan's).
       var bandStart, bandEnd;
       if (hz.type === "wall"){ bandStart = hz.xStart; bandEnd = hz.xEnd; }
       else { bandStart = hz.pivotX; bandEnd = hz.pivotX + hz.coreWidthPx; }
@@ -1008,13 +1133,21 @@
       barsClassifiedUpTo -= REBASE_BAR_SHIFT;
       // M5a/M5b: hazards carry their own world-space x, not a bar-index, so they
       // shift by the raw pixel amount rather than REBASE_BAR_SHIFT. `xEnd` is
-      // generic across every type (see dropOldHazards()); each type's own
-      // additional x-field(s) still need their own line here.
+      // generic across every type (see dropOldHazards()); gannFan is the only type
+      // still anchored on `pivotX` instead of `xStart` — everyone else (wall,
+      // tunnel, and future xStart/xEnd-based types) shares the same branch.
       for (var hzR=0; hzR<hazards.length; hzR++){
         var hzShift = hazards[hzR];
         hzShift.xEnd -= REBASE_SHIFT_PX;
-        if (hzShift.type === "wall") hzShift.xStart -= REBASE_SHIFT_PX;
-        else hzShift.pivotX -= REBASE_SHIFT_PX;
+        if (hzShift.type === "gannFan") hzShift.pivotX -= REBASE_SHIFT_PX;
+        else hzShift.xStart -= REBASE_SHIFT_PX;
+        // Tunnel's MA samples are keyed by absolute bar-index (see spawnTunnel()),
+        // the same coordinate space as barsBaseIndex/barsGenIndex/etc. above — they
+        // need the bar-index-space shift, not the raw pixel one, to stay lined up
+        // with tunnelCenterY()'s `worldX/COLW` lookup after the rebase.
+        if (hzShift.type === "tunnel"){
+          for (var sI=0; sI<hzShift.samples.length; sI++) hzShift.samples[sI].absIndex -= REBASE_BAR_SHIFT;
+        }
       }
       nextHazardX -= REBASE_SHIFT_PX;
     }
@@ -1198,6 +1331,7 @@
   function testHazardCollision(hazard, player){
     if (hazard.type === "gannFan") return testGannFanCollision(hazard, player);
     if (hazard.type === "wall") return testWallCollision(hazard, player);
+    if (hazard.type === "tunnel") return testTunnelCollision(hazard, player);
     return null;
   }
 
@@ -1237,6 +1371,22 @@
     return null;
   }
 
+  // Containment test, not a jump/hurdle test (per the ticket): `player.y` — the
+  // same top-edge coordinate the rest of the physics uses — has to stay between
+  // the tunnel's upper and lower curves at the player's current x. Rate-limited by
+  // `lastGrazeAt` rather than a one-time hitApplied flag (see resolveHazards()) —
+  // straying outside costs a small, repeatable penalty for as long as the player
+  // stays out, not a single scored event, which is the point of a
+  // precision/restraint hazard: sustained carelessness costs more, brief
+  // carelessness costs little, instead of either "free" or "instant kill."
+  function testTunnelCollision(hazard, player){
+    if (player.x < hazard.xStart || player.x > hazard.xEnd) return null;
+    if (performance.now() - hazard.lastGrazeAt < TUNNEL_GRAZE_COOLDOWN_MS) return null;
+    var upperY = tunnelUpperY(hazard, player.x), lowerY = tunnelLowerY(hazard, player.x);
+    if (player.y < upperY || player.y > lowerY) return hazard;
+    return null;
+  }
+
   // Analogous to resolveObstacles(): scans every currently-live hazard, once per
   // frame, for a hit. `hitApplied` makes the penalty one-time per hazard (gannFan
   // keys it per-line since a fan has five; wall keys it on the hazard itself since
@@ -1249,11 +1399,24 @@
   // M5b: each type gets its own SoundFX cue — wallHit() here, distinct from
   // hazardHit() (Gann fan) and bump() (candles), per the ticket's "don't make
   // every hazard sound identical" instruction.
+  // M5b #2: the tunnel is deliberately NOT part of that shared "-3, one-time"
+  // branch — per the ticket, straying outside it is a graze, not a hit: a
+  // smaller, repeatable -1 (still leverage-scaled via the same applyPnlDelta()
+  // pathway) gated by testTunnelCollision()'s own cooldown rather than a
+  // hitApplied flag, with its own softer SoundFX.tunnelGraze() cue and an amber
+  // (not red) float-text color so it visibly reads as a different kind of
+  // consequence, not just a cheaper hit.
   function resolveHazards(){
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
       var hit = testHazardCollision(hz, player);
-      if (hit){
+      if (!hit) continue;
+      if (hz.type === "tunnel"){
+        hz.lastGrazeAt = performance.now();
+        applyPnlDelta(-TUNNEL_GRAZE_PENALTY);
+        SoundFX.tunnelGraze();
+        spawnFloatText("-1", "#ffb454", false);
+      } else {
         hit.hitApplied = true;
         applyPnlDelta(-3);
         SoundFX[hz.type === "wall" ? "wallHit" : "hazardHit"]();
@@ -1291,6 +1454,7 @@
       var hz = hazards[i];
       if (hz.type === "gannFan") drawGannFan(ctx, cam, w, hz);
       else if (hz.type === "wall") drawWall(ctx, cam, w, hz);
+      else if (hz.type === "tunnel") drawTunnel(ctx, cam, w, hz);
     }
   }
 
@@ -1352,6 +1516,52 @@
     ctx.font = "10px 'IBM Plex Mono', monospace";
     var label = hz.role === "resistance" ? "RESISTANCE" : "SUPPORT";
     ctx.fillText(label, x0+6, hz.role === "resistance" ? y-6 : y+14);
+  }
+
+  // M5b #2: not direction-conditional, so this deliberately skips the red/green
+  // hostile-vs-passable convention every other hazard uses (that convention would
+  // wrongly imply "safe on one side" here) — a neutral amber instead, matching the
+  // graze float-text color, plus a faint fill of the safe corridor itself so the
+  // "stay inside this shape" read doesn't depend on tracking two separate curves.
+  function drawTunnel(ctx, cam, w, hz){
+    if (hz.xEnd < cam || hz.xStart > cam+w) return; // fully off-screen
+    var x0 = Math.max(hz.xStart, cam), x1 = Math.min(hz.xEnd, cam+w);
+    if (x1 <= x0) return;
+    var step = 6;
+
+    ctx.beginPath();
+    var first = true;
+    for (var x = x0; x <= x1; x += step){
+      var uy = tunnelUpperY(hz, x);
+      if (first){ ctx.moveTo(x-cam, uy); first = false; } else ctx.lineTo(x-cam, uy);
+    }
+    ctx.lineTo(x1-cam, tunnelUpperY(hz, x1));
+    for (var xB = x1; xB >= x0; xB -= step){
+      ctx.lineTo(xB-cam, tunnelLowerY(hz, xB));
+    }
+    ctx.lineTo(x0-cam, tunnelLowerY(hz, x0));
+    ctx.closePath();
+    ctx.fillStyle = "#ffb454";
+    ctx.globalAlpha = .1;
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffb454";
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = .75;
+    drawTunnelCurve(ctx, cam, hz, x0, x1, step, tunnelUpperY);
+    drawTunnelCurve(ctx, cam, hz, x0, x1, step, tunnelLowerY);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTunnelCurve(ctx, cam, hz, x0, x1, step, yFn){
+    ctx.beginPath();
+    var first = true;
+    for (var x = x0; x <= x1; x += step){
+      var y = yFn(hz, x);
+      if (first){ ctx.moveTo(x-cam, y); first = false; } else ctx.lineTo(x-cam, y);
+    }
+    ctx.lineTo(x1-cam, yFn(hz, x1));
+    ctx.stroke();
   }
 
   function drawTerrain(cam, idx){
