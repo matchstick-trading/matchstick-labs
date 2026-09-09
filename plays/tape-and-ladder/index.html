@@ -266,6 +266,7 @@
       <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="360" aria-label="Candle terrain runner"></canvas></div>
       <div class="hud">
         <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
+        <span><span class="tag">LEVERAGE</span> <span id="hudLeverage">&mdash;</span></span>
         <span><span class="tag">PNL</span> <span id="hudPnl">0</span></span>
         <span><span class="tag">TO STOP</span> <span id="hudToStop">&mdash;</span></span>
         <span><span class="tag">TO LIMIT</span> <span id="hudToLimit">&mdash;</span></span>
@@ -292,7 +293,7 @@
     <p>Each round you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set a <b>STOP</b> and a <b>LIMIT</b> &mdash; both at least 3 ticks from entry. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you. Clear an obstacle for profit, miss it and it costs you. Bank your LIMIT and the run continues, a little harder. Hit your STOP and the run is over.</p>
     <div class="kbrow"><kbd>&larr;</kbd><kbd>&rarr;</kbd> <span>run</span></div>
     <div class="kbrow"><kbd>&uarr;</kbd> <span>jump</span></div>
-    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor (while setting stop/limit)</span></div>
+    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor &mdash; sets stop/limit before the run, then live leverage (1x-8x) once running; crossing entry flips LONG/SHORT</span></div>
     <div class="kbrow"><kbd>SPACE</kbd> <span>confirm stop, then confirm limit</span></div>
     <div class="kbrow"><kbd>R</kbd> <span>start a new run (resets score)</span></div>
     <p style="margin-top:10px;">On a touch device, the same actions are mirrored by the on-screen buttons at the bottom of the screen.</p>
@@ -488,8 +489,21 @@
     "That's what the stop is for."
   ];
 
+  // M4: live leverage/direction control while running. LADDER_MOVE_COOLDOWN_MS caps
+  // how fast the cursor can climb (keyboard repeat is already blocked by e.repeat on
+  // keydown, but this also covers rapid distinct presses and touch taps, and is the
+  // single place both input paths funnel through — see doLadderMove()). The lockout
+  // window mirrors resolveObstacles()'s own centerIdx-2..centerIdx+2 collision-resolve
+  // scan (plus 1 bar of margin ahead, since a flip can land in the gap between two
+  // rAF frames) — see reclassifyUnresolvedBars().
+  var LADDER_MOVE_COOLDOWN_MS = 120;
+  var lastLadderMoveAt = -Infinity;
+  var LADDER_FLIP_LOCKOUT_BEHIND = 2;
+  var LADDER_FLIP_LOCKOUT_AHEAD = 3;
+
   var phase = "setup";          // setup -> running -> roundwin|gameover
   var direction = "LONG";       // this round's assigned side
+  var leverage = 1;             // M4: 1x-8x, set by ladder rung distance from entry while running
   var round = 1, score = 0;
   var placementStep = "stop";   // "stop" | "limit"
   var stopIdx = null, limitIdx = null, stopTicks = null, limitTicks = null;
@@ -662,6 +676,59 @@
     }
   }
 
+  // M4 item 3 judgment call: without this, a mid-run direction flip (see
+  // doLadderMove()) would only affect bars *generated* after the flip — and
+  // ensureBarsGenerated() keeps ~GEN_AHEAD_BARS (60) bars pre-generated ahead of the
+  // camera's leading edge, so "every candle ahead" would in practice mean "every
+  // candle 60+ bars / several seconds from now," not something the player could
+  // meaningfully react to. That's too weak a payoff for a mechanic billed as "crossing
+  // the line flips your direction." So a flip DOES reclassify already-generated bars —
+  // but only ones that are (a) unresolved (never touch a bar whose outcome is already
+  // scored — that's the one hard constraint from the ticket) and (b) outside the
+  // LADDER_FLIP_LOCKOUT_BEHIND/AHEAD window around the player's current position,
+  // which mirrors resolveObstacles()'s own collision-resolve scan. (b) is what makes
+  // (a) safe: without it, a player already overlapping an obstacle bar (or about to
+  // resolve one this very frame) could flip an instant before impact and retroactively
+  // dodge it. The net effect: a flip narrows the reaction window to "everything from a
+  // few bars ahead of you out to the generation horizon" rather than instantly
+  // rewriting the whole visible tape — a real, deliberately-scoped tradeoff, not the
+  // full "every candle ahead, immediately" spec.
+  //
+  // MIN_OBSTACLE_GAP_COLS bookkeeping note: lastObstacleAbsI is a sequential,
+  // classification-order-dependent cursor. If it currently points at a bar inside the
+  // range we're about to reclassify, that bar's isObstacle status may be about to
+  // change, so its old contribution to lastObstacleAbsI would no longer be true — it's
+  // rebuilt below from whatever's still in the live `bars` window at/before the lockout
+  // boundary. Accepted edge case: if the true most-recent obstacle has already scrolled
+  // out of the live window (dropped by dropOldBars()), the rebuild can't see it and
+  // falls back to -999, which can very rarely under-space one obstacle right after a
+  // flip. Since dropped bars are always resolved and already off-screen, this is a
+  // cosmetic, non-crashing, non-scoring edge case — not worth the extra cross-drop
+  // history tracking it would take to close completely for an M4 milestone.
+  function reclassifyUnresolvedBars(){
+    var centerIdx = terrainIndexAt(player.x);
+    var lockoutStart = Math.max(0, centerIdx - LADDER_FLIP_LOCKOUT_BEHIND);
+    var lockoutEnd = centerIdx + LADDER_FLIP_LOCKOUT_AHEAD;
+
+    if (lastObstacleAbsI > lockoutEnd){
+      var rebuilt = -999;
+      for (var k=0;k<bars.length;k++){
+        var absK = barsBaseIndex+k;
+        if (absK > lockoutEnd) break;
+        if (bars[k].isObstacle) rebuilt = absK;
+      }
+      lastObstacleAbsI = rebuilt;
+    }
+
+    for (var m=0;m<bars.length;m++){
+      var absM = barsBaseIndex+m;
+      if (absM >= lockoutStart && absM <= lockoutEnd) continue; // frozen: inside this frame's collision-resolve margin
+      var bm = bars[m];
+      if (bm.resolved) continue; // never touch a scored bar
+      classifyBar(bm, absM);
+    }
+  }
+
   // Drops bars once they've scrolled well behind the camera, keeping the live
   // window bounded in size no matter how long the run goes. DROP_MARGIN_BARS
   // covers drawTerrain's own -1 lookback so nothing still on-screen gets dropped.
@@ -817,6 +884,11 @@
   // obstacles swing it hard: +2 cleared, -3 hit. Only every 3rd non-obstacle
   // bar is sampled for ambient PnL so a round has a legible pace instead of
   // ticking on every single candle.
+  // M4: `leverage` (1x-8x, set live by the ladder cursor's distance from entry — see
+  // doLadderMove()) scales every delta's magnitude both ways, same as read live at
+  // resolution time — bigger swings up AND down, not just a directional safety net.
+  // Explicitly not touching the win/lose thresholds themselves (checkRoundOutcome
+  // still compares raw pnlTicks against stopTicks/limitTicks) — that model is M6.
   function resolveBar(b, kind){
     b.resolved = true;
     var delta = 0;
@@ -824,7 +896,7 @@
     else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); }
     else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
     else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); }
-    pnlTicks += delta;
+    pnlTicks += delta * leverage;
     checkRoundOutcome();
   }
 
@@ -944,11 +1016,13 @@
 
   function updateHud(){
     var posEl = document.getElementById("hudPosition");
+    var levEl = document.getElementById("hudLeverage");
     var pnlEl = document.getElementById("hudPnl");
     var toStopEl = document.getElementById("hudToStop");
     var toLimitEl = document.getElementById("hudToLimit");
     posEl.textContent = direction;
     posEl.className = direction === "LONG" ? "up" : "down";
+    levEl.textContent = phase === "running" ? (leverage + "x") : "—";
     pnlEl.textContent = (pnlTicks >= 0 ? "+" : "") + pnlTicks;
     pnlEl.className = pnlTicks >= 0 ? "up" : "down";
     toStopEl.textContent = stopTicks != null ? Math.max(0, stopTicks + pnlTicks) : "—";
@@ -995,15 +1069,55 @@
     return side === "bid" ? {minIdx:0, maxIdx:BID_N-MIN_TICKS} : {minIdx:BID_N+MIN_TICKS-1, maxIdx:TOTAL-1};
   }
 
-  // Shared by keyboard (W/S) and touch (climb up/down buttons) so both drive
-  // the exact same clamped range + sound cue.
+  // M4: the running-phase side of the ladder. Distinct from sideForStep(), which is
+  // about where a STOP/LIMIT *order* sits relative to your direction (unchanged, still
+  // setup-only) — this is about which half of the ladder represents *being* LONG vs
+  // SHORT while the leverage cursor is live. Climbing up (higher idx, visually higher
+  // on the ladder — see ladderRowY()) always means "further up the price ladder";
+  // since idx>=BID_N is the ask half (above entry) and idx<BID_N is the bid half
+  // (below), climbing into ask == LONG and climbing into bid == SHORT falls straight
+  // out of that, with idxToTicks() giving the 1-8 leverage rung for free.
+  function sideForDirection(dir){ return dir === "LONG" ? "ask" : "bid"; }
+
+  // Shared by keyboard (W/S) and touch (climb up/down buttons) so both drive the exact
+  // same clamped range + sound cue. Two very different phases share this entry point:
+  //  - "setup": unchanged from before M4 — clamped to the current placementStep's
+  //    valid stop/limit range, no rate cap (placing an order isn't a leverage/direction
+  //    lever, so the anti-spam cap in the ticket doesn't apply here).
+  //  - "running" (M4): the cursor is now a continuous leverage/direction control. It
+  //    can move anywhere across the full 0..TOTAL-1 range (no MIN_TICKS reservation —
+  //    that was only ever about leaving room for a second stop/limit placement), rate-
+  //    capped to LADDER_MOVE_COOLDOWN_MS per rung, and crossing the BID_N boundary
+  //    flips `direction` (and reclassifies the tape ahead of the lockout window — see
+  //    reclassifyUnresolvedBars()).
   function doLadderMove(delta){
-    if (phase !== "setup") return;
-    var side = sideForStep(placementStep);
-    var range = rangeForSide(side);
-    var prevIdx = ladderPlayer.idx;
-    ladderPlayer.idx = clamp(ladderPlayer.idx+delta, range.minIdx, range.maxIdx);
-    if (ladderPlayer.idx !== prevIdx) SoundFX.climbStep();
+    if (phase === "setup"){
+      var side = sideForStep(placementStep);
+      var range = rangeForSide(side);
+      var prevIdx = ladderPlayer.idx;
+      ladderPlayer.idx = clamp(ladderPlayer.idx+delta, range.minIdx, range.maxIdx);
+      if (ladderPlayer.idx !== prevIdx) SoundFX.climbStep();
+      return;
+    }
+    if (phase !== "running") return;
+
+    var now = performance.now();
+    if (now - lastLadderMoveAt < LADDER_MOVE_COOLDOWN_MS) return;
+
+    var prevIdx2 = ladderPlayer.idx;
+    var newIdx = clamp(prevIdx2 + delta, 0, TOTAL-1);
+    if (newIdx === prevIdx2) return; // already at the rail — don't spend the cooldown on a no-op
+    lastLadderMoveAt = now;
+    ladderPlayer.idx = newIdx;
+    leverage = idxToTicks(newIdx);
+    SoundFX.climbStep();
+
+    var prevDirection = direction;
+    direction = newIdx < BID_N ? "SHORT" : "LONG";
+    if (direction !== prevDirection){
+      SoundFX.spreadCross(); // reuse the existing "crossed the spread" cue for a flip
+      reclassifyUnresolvedBars();
+    }
   }
 
   function confirmPlacement(){
@@ -1029,12 +1143,19 @@
     resetTerrainPlayerVerticals();
     pnlTicks = 0;
     phase = "running";
+    // M4: hand the ladder cursor over to running-phase leverage/direction semantics —
+    // start at 1x on whichever side matches the direction the round was assigned, i.e.
+    // right at the entry line, the least-aggressive rung on the correct side.
+    leverage = 1;
+    ladderPlayer.idx = ticksToIdx(sideForDirection(direction), 1);
+    lastLadderMoveAt = -Infinity;
     SoundFX.positionLocked();
     updateHud();
   }
 
   function newRound(){
     direction = Math.random() < 0.5 ? "LONG" : "SHORT";
+    leverage = 1;
     pnlTicks = 0;
     stopIdx = null; limitIdx = null; stopTicks = null; limitTicks = null;
     placementStep = "stop";
@@ -1105,6 +1226,14 @@
         ctx.font = "bold 10px 'IBM Plex Mono', monospace";
         ctx.fillText("LIMIT", x+8, row.y+row.h/2-9);
       }
+      // M4: while running, the cursor row itself is the live leverage rung — labeled
+      // separately from STOP/LIMIT (which stay put at whatever rows they were set on
+      // during setup and no longer move).
+      if (phase === "running" && ladderPlayer.idx===i && stopIdx!==i && limitIdx!==i){
+        ctx.fillStyle = "#d8f5e2";
+        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
+        ctx.fillText(leverage + "x", x+8, row.y+row.h/2-9);
+      }
     }
 
     var mid = (ladderRowY(BID_N-1).y + ladderRowY(BID_N).y + ladderRowY(BID_N).h) / 2;
@@ -1116,7 +1245,9 @@
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.fillText("ENTRY", 8, mid-8);
 
-    if (inSetup){
+    // M4: the cursor marker is no longer setup-only — it's the live leverage/direction
+    // rung while running too (see doLadderMove()'s running-phase branch).
+    if (inSetup || phase === "running"){
       var pr = ladderRowY(ladderPlayer.idx);
       ctx.shadowColor = "#d8f5e2";
       ctx.shadowBlur = 8;
@@ -1131,7 +1262,12 @@
       var stepLabel = placementStep === "stop" ? "SET STOP" : "SET LIMIT";
       lLevelEl.innerHTML = "<b>" + stepLabel + "</b> &mdash; " + idxToTicks(ladderPlayer.idx) + " ticks";
     } else if (stopTicks != null){
-      lLevelEl.innerHTML = '<span class="down">STOP -' + stopTicks + '</span> &middot; <span class="up">LIMIT +' + limitTicks + '</span>';
+      // M4: leverage/direction are live while running — surfaced here alongside the
+      // (now-fixed) stop/limit distances so the ladder panel always shows what the
+      // cursor is currently doing.
+      var dirCls = direction === "LONG" ? "up" : "down";
+      lLevelEl.innerHTML = '<span class="down">STOP -' + stopTicks + '</span> &middot; <span class="up">LIMIT +' + limitTicks + '</span>' +
+        ' &middot; <b class="' + dirCls + '">' + leverage + 'x ' + direction + '</b>';
     }
   }
 
@@ -1240,11 +1376,14 @@
     if (e.repeat) return;
     if (e.key === "ArrowUp") jumpQueued = true;
 
-    if (phase === "setup"){
-      if (e.key === "w" || e.key === "W") doLadderMove(1);
-      if (e.key === "s" || e.key === "S") doLadderMove(-1);
-      if (e.key === " " || e.key === "Enter") confirmPlacement();
-    }
+    // M4: W/S now drive the ladder in both "setup" (placing stop/limit) and "running"
+    // (live leverage/direction) phases — doLadderMove() itself branches on phase and
+    // no-ops outside both. Confirm (SPACE/Enter) stays setup-only; calling
+    // confirmPlacement() while running would re-run the stop/limit-lock flow on a
+    // position that's already locked in.
+    if (e.key === "w" || e.key === "W") doLadderMove(1);
+    if (e.key === "s" || e.key === "S") doLadderMove(-1);
+    if (phase === "setup" && (e.key === " " || e.key === "Enter")) confirmPlacement();
   }, {passive:false});
   window.addEventListener("keyup", function(e){ keysHeld[e.key]=false; });
 
