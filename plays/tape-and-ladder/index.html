@@ -665,10 +665,23 @@
   var GAP_VOID_HEIGHT_PX = 100;
   var GAP_NEWS_LEAD_PX = 90; // how far before xStart the telegraph candle sits
 
+  // M5b hazard 4: volume-spike field. Explicitly NOT a new collision mechanic
+  // (per the ticket) — a tight cluster of 3-4 short obstacle bars, reusing the
+  // exact same AABB hurdle rule ordinary candle obstacles use (see
+  // obstacleHurdleOverlap()), just packed far tighter than MIN_OBSTACLE_GAP_COLS
+  // (5 columns = 120px) ever allows for a real candle. The point is cadence — a
+  // rapid double/triple-hop — not a new height/reach/timing rule, so heights stay
+  // in the shorter half of an ordinary obstacle's own 18-85px range (see
+  // classifyBar()) rather than inventing a new scale.
+  var VOLSPIKE_COUNT_MIN = 3, VOLSPIKE_COUNT_MAX = 4; // inclusive
+  var VOLSPIKE_WIDTH_PX = 10;    // thin, volume-histogram-style bar
+  var VOLSPIKE_SPACING_PX = 44;  // center-to-center — under 2 columns, well inside MIN_OBSTACLE_GAP_COLS*COLW
+  var VOLSPIKE_MIN_HEIGHT_PX = 18, VOLSPIKE_MAX_HEIGHT_PX = 50;
+
   // M5b: which hazard types the streaming spawner can pick from — extend this list
   // (not ensureHazardsSpawned()'s loop shape) as each new M5b type lands, per the
   // ticket's "reuse the pattern without restructuring it" instruction.
-  var HAZARD_TYPES = ["gannFan", "wall", "tunnel", "gap"];
+  var HAZARD_TYPES = ["gannFan", "wall", "tunnel", "gap", "volSpikes"];
 
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
@@ -1158,6 +1171,33 @@
     }
   }
 
+  // ------------------------------------------------------------ HAZARDS (M5b #4)
+  // Volume-spike field: 3-4 independent spikes, each its own collidable band with
+  // its own hitApplied flag (clearing or hitting one doesn't affect the others) —
+  // same "each collidable unit resolves independently" shape as Gann fan's
+  // per-line hitApplied, just applied to a handful of tiny obstacle bars instead
+  // of five lines. Not direction-conditional (see reclassifyHazards()'s skip) —
+  // unlike a candle, a volume spike isn't a proxy for market direction, just a
+  // fixed rhythm obstacle, so there's no `hostile` flag to compute here at all.
+  function spawnVolSpikes(xStart){
+    var count = VOLSPIKE_COUNT_MIN + Math.floor(rand()*(VOLSPIKE_COUNT_MAX-VOLSPIKE_COUNT_MIN+1));
+    var spikes = [];
+    var x = xStart;
+    for (var i=0;i<count;i++){
+      spikes.push({
+        x: x,
+        hurdlePx: VOLSPIKE_MIN_HEIGHT_PX + rand()*(VOLSPIKE_MAX_HEIGHT_PX-VOLSPIKE_MIN_HEIGHT_PX),
+        hitApplied: false
+      });
+      x += VOLSPIKE_SPACING_PX;
+    }
+    hazards.push({
+      type: "volSpikes",
+      xStart: xStart, xEnd: x - VOLSPIKE_SPACING_PX + VOLSPIKE_WIDTH_PX,
+      spikes: spikes
+    });
+  }
+
   // Keeps the next hazard spawned ~HAZARD_SPAWN_AHEAD_PX past the camera's leading
   // edge, same "stay filled ahead of the frontier" shape as ensureBarsGenerated(),
   // decoupled onto its own world-pixel cadence and its own RNG draws (gap size).
@@ -1170,6 +1210,7 @@
     if (kind === "wall") spawnWall(worldX);
     else if (kind === "tunnel") spawnTunnel(worldX);
     else if (kind === "gap") spawnGap(worldX);
+    else if (kind === "volSpikes") spawnVolSpikes(worldX);
     else spawnGannFan(worldX);
   }
 
@@ -1210,10 +1251,11 @@
       var hz = hazards[i];
       // M5b: neither the tunnel (see spawnTunnel()'s comment) nor the gap (a
       // structural ground-presence effect, not a direction-conditional hostility
-      // flag — see spawnGap()'s comment) has anything to reclassify, so both are
-      // skipped before the band check below even bothers looking at fields they
-      // don't have.
-      if (hz.type === "tunnel" || hz.type === "gap") continue;
+      // flag — see spawnGap()'s comment) nor volSpikes (always-hostile to both
+      // directions, same as an ordinary candle — see spawnVolSpikes()'s comment)
+      // has anything to reclassify, so all three are skipped before the band
+      // check below even bothers looking at fields they don't have.
+      if (hz.type === "tunnel" || hz.type === "gap" || hz.type === "volSpikes") continue;
       // Each type's own collidable band, not the generic xStart/xEnd — matches the
       // pre-existing gannFan behavior (core band only; the cosmetic fade tail was
       // never part of the lockout check) and gives wall an equivalently precise
@@ -1263,6 +1305,13 @@
         // tunnel's samples above — a field the generic xStart/xEnd branch doesn't
         // know about.
         if (hzShift.type === "gap") hzShift.newsX -= REBASE_SHIFT_PX;
+        // volSpikes: xStart/xEnd cover the whole cluster (shifted generically
+        // above), but each individual spike also carries its own world-space x
+        // (used by drawVolSpikes()/testVolSpikesCollision()) that the generic
+        // branch doesn't know about, same reasoning as gap's newsX above.
+        if (hzShift.type === "volSpikes"){
+          for (var vI=0; vI<hzShift.spikes.length; vI++) hzShift.spikes[vI].x -= REBASE_SHIFT_PX;
+        }
       }
       nextHazardX -= REBASE_SHIFT_PX;
     }
@@ -1417,13 +1466,23 @@
     return {idx:idx, cam:cam};
   }
 
-  function playerObstacleOverlap(b, i){
+  // M5b #4: factored out of the old playerObstacleOverlap() so volSpikes can
+  // share the exact same AABB hurdle math against an arbitrary world-space
+  // [hx0,hx1) band instead of a bar-index-derived column — per the ticket,
+  // volSpikes must use "the same AABB hurdle rule as ordinary candles... not a
+  // new collision mechanic," so this is the one true hurdle test now, and both
+  // callers just supply their own band.
+  function obstacleHurdleOverlap(hx0, hx1, hurdlePx){
     var baseline = baselineY();
-    var hx0 = i*COLW + HIT_INSET_X, hx1 = i*COLW + COLW - HIT_INSET_X;
-    var hTop = baseline - b.hurdlePx + HIT_INSET_TOP, hBot = baseline;
+    var hTop = baseline - hurdlePx + HIT_INSET_TOP, hBot = baseline;
     var px0 = player.x - PLAYER_W/2 + 2, px1 = player.x + PLAYER_W/2 - 2;
     var py0 = player.y + 2, py1 = player.y + PLAYER_H;
     return px1 > hx0 && px0 < hx1 && py1 > hTop && py0 < hBot;
+  }
+
+  function playerObstacleOverlap(b, i){
+    var hx0 = i*COLW + HIT_INSET_X, hx1 = i*COLW + COLW - HIT_INSET_X;
+    return obstacleHurdleOverlap(hx0, hx1, b.hurdlePx);
   }
 
   function resolveObstacles(){
@@ -1501,6 +1560,7 @@
     if (hazard.type === "gannFan") return testGannFanCollision(hazard, player);
     if (hazard.type === "wall") return testWallCollision(hazard, player);
     if (hazard.type === "tunnel") return testTunnelCollision(hazard, player);
+    if (hazard.type === "volSpikes") return testVolSpikesCollision(hazard, player);
     return null;
   }
 
@@ -1556,6 +1616,24 @@
     return null;
   }
 
+  // Per the ticket: "same AABB hurdle rule as ordinary candles... not a new
+  // collision mechanic" — this loops the cluster's individual spikes and reuses
+  // obstacleHurdleOverlap() (the exact same math playerObstacleOverlap() calls
+  // for a candle), just keyed to each spike's own world-space [x, x+width) band
+  // and its own hurdlePx instead of a bar-index column. `hitApplied` is tracked
+  // per-spike (not once for the whole cluster) so a rhythm-test miss on spike 2
+  // of 4 doesn't give the other three a free pass — each spike scores its own
+  // -3 independently, same as if they were four separate candles.
+  function testVolSpikesCollision(hazard, player){
+    if (player.x < hazard.xStart || player.x > hazard.xEnd) return null; // xStart/xEnd already bound the whole cluster
+    for (var i=0;i<hazard.spikes.length;i++){
+      var sp = hazard.spikes[i];
+      if (sp.hitApplied) continue;
+      if (obstacleHurdleOverlap(sp.x + HIT_INSET_X, sp.x + VOLSPIKE_WIDTH_PX - HIT_INSET_X, sp.hurdlePx)) return sp;
+    }
+    return null;
+  }
+
   // Analogous to resolveObstacles(): scans every currently-live hazard, once per
   // frame, for a hit. `hitApplied` makes the penalty one-time per hazard (gannFan
   // keys it per-line since a fan has five; wall keys it on the hazard itself since
@@ -1575,6 +1653,15 @@
   // hitApplied flag, with its own softer SoundFX.tunnelGraze() cue and an amber
   // (not red) float-text color so it visibly reads as a different kind of
   // consequence, not just a cheaper hit.
+  // M5b #4: volSpikes deliberately reuses SoundFX.bump() — the ticket asks for "a
+  // distinct sound cue per hazard type," but it also explicitly frames volSpikes
+  // as mechanically identical to an ordinary candle ("same AABB hurdle rule...
+  // not a new collision mechanic"), just spaced into a rhythm test. Giving it
+  // candles' own bump() (rather than inventing a fifth SFX for what's still, per
+  // the ticket's own description, a candle-shaped hit) is still "distinct from
+  // the Gann-fan hit" (hazardHit()) and from wallHit()/tunnelGraze() — the one
+  // deliberate exception, made because the ticket's own hazard description calls
+  // for identity with candles here, not novelty.
   function resolveHazards(){
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
@@ -1588,7 +1675,8 @@
       } else {
         hit.hitApplied = true;
         applyPnlDelta(-3);
-        SoundFX[hz.type === "wall" ? "wallHit" : "hazardHit"]();
+        var hitSound = hz.type === "wall" ? "wallHit" : (hz.type === "volSpikes" ? "bump" : "hazardHit");
+        SoundFX[hitSound]();
         spawnFloatText("-3", "#ff6b5c", true);
       }
     }
@@ -1625,6 +1713,7 @@
       else if (hz.type === "wall") drawWall(ctx, cam, w, hz);
       else if (hz.type === "tunnel") drawTunnel(ctx, cam, w, hz);
       else if (hz.type === "gap") drawGap(ctx, cam, w, hz);
+      else if (hz.type === "volSpikes") drawVolSpikes(ctx, cam, w, hz);
     }
   }
 
@@ -1791,6 +1880,34 @@
     ctx.moveTo(x0, baseline-GAP_VOID_HEIGHT_PX); ctx.lineTo(x0, tSurf.h);
     ctx.moveTo(x1, baseline-GAP_VOID_HEIGHT_PX); ctx.lineTo(x1, tSurf.h);
     ctx.stroke();
+  }
+
+  // M5b #4: a dedicated accent color (#8ec9ff, blue — no existing token in
+  // :root reads as "volume," and every other hazard already owns red/green/amber
+  // /void, so this is the one new color, per the same "distinct visual
+  // telegraphing" bar the ticket raised for candles) rather than reusing an
+  // existing hostile-red so a volSpikes cluster doesn't get misread as another
+  // wall/gannFan at a glance. Each bar's drawn height is exactly its hurdlePx —
+  // same WYSIWYG discipline as the M5.5 obstacle-body fix (see the `bodyPx`
+  // comment above in drawTerrain) — so what's visible is exactly what
+  // testVolSpikesCollision()/obstacleHurdleOverlap() tests against, not an
+  // approximation of it.
+  function drawVolSpikes(ctx, cam, w, hz){
+    if (hz.xEnd < cam || hz.xStart > cam+w) return; // fully off-screen
+    var baseline = baselineY();
+    for (var i=0;i<hz.spikes.length;i++){
+      var sp = hz.spikes[i];
+      var sx = sp.x - cam;
+      if (sx + VOLSPIKE_WIDTH_PX < 0 || sx > w) continue;
+      ctx.fillStyle = "#8ec9ff";
+      ctx.globalAlpha = sp.hitApplied ? .3 : .8;
+      ctx.fillRect(sx, baseline - sp.hurdlePx, VOLSPIKE_WIDTH_PX, sp.hurdlePx);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = sp.hitApplied ? .3 : 1;
+      ctx.strokeRect(sx, baseline - sp.hurdlePx, VOLSPIKE_WIDTH_PX, sp.hurdlePx);
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawTerrain(cam, idx){
