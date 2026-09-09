@@ -454,6 +454,15 @@
         tone(140, 0.2, {type:"square", slideTo:55, gain:0.14});
         setTimeout(function(){ tone(100, 0.14, {type:"square", slideTo:40, gain:0.1}); }, 90);
       },
+      // M5b: support/resistance wall hit — a "ran into something solid" register,
+      // distinct from hazardHit()'s two-stage descending buzz (Gann fan) and
+      // bump()'s bright crack (candles): one low-cutoff noise knock plus a single
+      // short, low square blip. No slide, no second stage — reads as a single
+      // blunt thud rather than a zap, matching a wall's "you hit a wall" framing.
+      wallHit: function(){
+        noiseBurst(0.07, {cutoff:500, gain:0.22});
+        tone(160, 0.1, {type:"square", gain:0.12});
+      },
       spreadCross: function(){
         if (!enabled) return;
         var notes = [660, 880, 1320];
@@ -598,6 +607,21 @@
   var GANN_CORE_WIDTH_PX = 420;    // solid + collidable for this many px past the pivot
   var GANN_FADE_WIDTH_PX = 140;    // then a cosmetic-only fade tail (no collision) before it's gone
   var GANN_HIT_THICKNESS_PX = 6;   // point-to-line collision tolerance
+
+  // M5b hazard 1: support/resistance wall. A resistance beam sits high (ceiling —
+  // ~150px above baseline puts it above a tap jump's ~130px head apex but below a
+  // full held jump's ~187px head apex, so staying low/tapping clears it and holding
+  // the jump button through it doesn't); a support beam sits low (hurdle — same
+  // 18-85px scale a candle obstacle's hurdlePx uses) and must be jumped over like an
+  // ordinary obstacle. Both widths randomize a bit like Gann's pivotY does.
+  var WALL_RESISTANCE_CLEARANCE_PX = 150, WALL_SUPPORT_HURDLE_PX = 60;
+  var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;
+  var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
+
+  // M5b: which hazard types the streaming spawner can pick from — extend this list
+  // (not ensureHazardsSpawned()'s loop shape) as each new M5b type lands, per the
+  // ticket's "reuse the pattern without restructuring it" instruction.
+  var HAZARD_TYPES = ["gannFan", "wall"];
 
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
@@ -836,6 +860,12 @@
       pivotX: pivotX, pivotY: pivotY,
       coreWidthPx: GANN_CORE_WIDTH_PX,
       fadeWidthPx: GANN_FADE_WIDTH_PX,
+      // M5b: generic drop/rebase bound shared across hazard types (see
+      // dropOldHazards()/maybeRebaseWorld()) — equals the old inline
+      // pivotX+coreWidthPx+fadeWidthPx expression dropOldHazards used to compute
+      // itself, just hoisted onto the hazard so that function doesn't need to know
+      // each type's own field names.
+      xEnd: pivotX + GANN_CORE_WIDTH_PX + GANN_FADE_WIDTH_PX,
       lines: [
         { ratio:"1x1", slope: 1,     hostile:false, hitApplied:false },
         { ratio:"2x1", slope: 2,     hostile:false, hitApplied:false },
@@ -869,24 +899,66 @@
     return hazard.pivotY - line.slope*(worldX - hazard.pivotX);
   }
 
+  // ------------------------------------------------------------ HAZARDS (M5b #1)
+  // Support/resistance wall: a single horizontal beam, not a fan of lines — role
+  // ("resistance" or "support") is intrinsic (fixed at spawn, coin-flip), hostility
+  // is resolved live against the current `direction` (same M3/M4 split every other
+  // hazard/candle uses). Market-metaphor mapping: resistance is a ceiling price
+  // struggles to break above, so in LONG (price wants to go up) it's the wall in
+  // your way — hostile; support is a floor price struggles to break below, so it's
+  // in your way for SHORT (price wants to go down). Both are harmless/walkable for
+  // the opposite direction, per the ticket.
+  function spawnWall(xStart){
+    var role = rand() < 0.5 ? "resistance" : "support";
+    var widthPx = WALL_MIN_WIDTH_PX + rand()*(WALL_MAX_WIDTH_PX-WALL_MIN_WIDTH_PX);
+    // Small jitter around each role's clearance/hurdle height, same spirit as
+    // Gann's randomized pivotY — kept inside the margin the physics comment above
+    // sized the constants for for (tap jump vs. held jump / stand vs. jump-over).
+    var beamY = role === "resistance"
+      ? baselineY() - (WALL_RESISTANCE_CLEARANCE_PX + (rand()*20-10))
+      : baselineY() - (WALL_SUPPORT_HURDLE_PX + (rand()*20-10));
+    var hazard = {
+      type: "wall", role: role,
+      xStart: xStart, xEnd: xStart + widthPx,
+      beamY: beamY, hostile: false, hitApplied: false
+    };
+    classifyWallHostility(hazard);
+    hazards.push(hazard);
+  }
+
+  function classifyWallHostility(hazard){
+    hazard.hostile = (hazard.role === "resistance") ? (direction === "LONG") : (direction === "SHORT");
+  }
+
   // Keeps the next hazard spawned ~HAZARD_SPAWN_AHEAD_PX past the camera's leading
   // edge, same "stay filled ahead of the frontier" shape as ensureBarsGenerated(),
   // decoupled onto its own world-pixel cadence and its own RNG draws (gap size).
   // Runs every frame regardless of round phase, same as the bar stream.
+  // M5b: type dispatch lives here, not inside ensureHazardsSpawned()'s loop — one
+  // new `if` per hazard type as the rest of M5b lands, same shape as
+  // testHazardCollision()/drawHazards()'s dispatch below.
+  function spawnHazardAt(worldX){
+    var kind = HAZARD_TYPES[Math.floor(rand()*HAZARD_TYPES.length)];
+    if (kind === "wall") spawnWall(worldX);
+    else spawnGannFan(worldX);
+  }
+
   function ensureHazardsSpawned(){
     var frontierX = cam + tSurf.w + HAZARD_SPAWN_AHEAD_PX;
     while (nextHazardX < frontierX){
-      spawnGannFan(nextHazardX);
+      spawnHazardAt(nextHazardX);
       nextHazardX += HAZARD_MIN_GAP_PX + rand()*(HAZARD_MAX_GAP_PX-HAZARD_MIN_GAP_PX);
     }
   }
 
-  // Mirrors dropOldBars(): hazards are pushed in ascending pivotX order, so once
-  // the oldest one has fully scrolled (core + fade) behind the camera, it's safe
-  // to drop from the front.
+  // Mirrors dropOldBars(): hazards are pushed in ascending x order, so once the
+  // oldest one's `xEnd` (a generic bound every hazard type sets at spawn — see
+  // spawnGannFan()/spawnWall()) has fully scrolled behind the camera, it's safe to
+  // drop from the front without this function needing to know each type's own
+  // field names.
   function dropOldHazards(){
     var keepFromX = cam - HAZARD_DROP_MARGIN_PX;
-    while (hazards.length > 0 && (hazards[0].pivotX + hazards[0].coreWidthPx + hazards[0].fadeWidthPx) < keepFromX){
+    while (hazards.length > 0 && hazards[0].xEnd < keepFromX){
       hazards.shift();
     }
   }
@@ -906,9 +978,17 @@
     var lockoutEnd = player.x + LADDER_FLIP_LOCKOUT_AHEAD*COLW;
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
-      var bandStart = hz.pivotX, bandEnd = hz.pivotX + hz.coreWidthPx;
+      // M5b: each type's own collidable band, not the generic xStart/xEnd —
+      // matches the pre-existing gannFan behavior (core band only; the cosmetic
+      // fade tail was never part of the lockout check) and gives wall an
+      // equivalently precise band (its xStart/xEnd already IS its full collidable
+      // span, unlike gannFan's).
+      var bandStart, bandEnd;
+      if (hz.type === "wall"){ bandStart = hz.xStart; bandEnd = hz.xEnd; }
+      else { bandStart = hz.pivotX; bandEnd = hz.pivotX + hz.coreWidthPx; }
       if (bandEnd >= lockoutStart && bandStart <= lockoutEnd) continue; // frozen: overlaps this frame's collision zone
-      classifyHazardLines(hz);
+      if (hz.type === "wall") classifyWallHostility(hz);
+      else classifyHazardLines(hz);
     }
   }
 
@@ -926,9 +1006,16 @@
       barsGenIndex -= REBASE_BAR_SHIFT;
       lastObstacleAbsI -= REBASE_BAR_SHIFT;
       barsClassifiedUpTo -= REBASE_BAR_SHIFT;
-      // M5a: hazards carry their own world-space x (pivotX), not a bar-index, so
-      // they shift by the raw pixel amount rather than REBASE_BAR_SHIFT.
-      for (var hzR=0; hzR<hazards.length; hzR++) hazards[hzR].pivotX -= REBASE_SHIFT_PX;
+      // M5a/M5b: hazards carry their own world-space x, not a bar-index, so they
+      // shift by the raw pixel amount rather than REBASE_BAR_SHIFT. `xEnd` is
+      // generic across every type (see dropOldHazards()); each type's own
+      // additional x-field(s) still need their own line here.
+      for (var hzR=0; hzR<hazards.length; hzR++){
+        var hzShift = hazards[hzR];
+        hzShift.xEnd -= REBASE_SHIFT_PX;
+        if (hzShift.type === "wall") hzShift.xStart -= REBASE_SHIFT_PX;
+        else hzShift.pivotX -= REBASE_SHIFT_PX;
+      }
       nextHazardX -= REBASE_SHIFT_PX;
     }
   }
@@ -1110,6 +1197,7 @@
   // without touching resolveHazards()'s scan loop below.
   function testHazardCollision(hazard, player){
     if (hazard.type === "gannFan") return testGannFanCollision(hazard, player);
+    if (hazard.type === "wall") return testWallCollision(hazard, player);
     return null;
   }
 
@@ -1129,17 +1217,38 @@
     return null;
   }
 
+  // Ceiling test for resistance (hostile in LONG) / hurdle test for support
+  // (hostile in SHORT) — one collidable band per wall, not five lines like the fan.
+  // Resistance: hostile means "stay under this line" — hit when the player's top
+  // edge has risen at/above beamY (forgiveness matches candles' HIT_INSET_TOP,
+  // shrinking the ceiling's hit region so a near-clear still reads as cleared).
+  // Support: hostile means "jump over this line" — same AABB hurdle shape
+  // playerObstacleOverlap() uses for a candle obstacle, just keyed to beamY
+  // instead of `baseline - b.hurdlePx` (a wall spans an arbitrary px range, not one
+  // COLW column, so it can't reuse that function directly).
+  function testWallCollision(hazard, player){
+    if (!hazard.hostile || hazard.hitApplied) return null;
+    if (player.x < hazard.xStart || player.x > hazard.xEnd) return null;
+    if (hazard.role === "resistance"){
+      if (player.y < hazard.beamY - WALL_HIT_THICKNESS_PX) return hazard;
+    } else {
+      if (player.y + PLAYER_H > hazard.beamY + WALL_HIT_THICKNESS_PX) return hazard;
+    }
+    return null;
+  }
+
   // Analogous to resolveObstacles(): scans every currently-live hazard, once per
-  // frame, for a hostile-line hit. `hitApplied` makes the penalty one-time per
-  // line — unlike a single-column candle, a shallow fan line can sit inside the
-  // hitbox for many consecutive frames, and this isn't a per-column event to key
-  // a `resolved` flag off. A hit applies the same -3-tick (leverage-scaled)
-  // penalty as a candle "hit" via applyPnlDelta() — reusing the exact scoring
-  // pathway bars already use, so the round win/lose model stays exactly as it was
-  // (out of scope here, per the ticket).
-  // M5.5: hazard hits now play SoundFX.hazardHit() instead of the candle's bump() —
-  // a distinct cue per the playtester ask, so a Gann-fan line hit doesn't sound
-  // identical to (and get lost among) ordinary candle contact.
+  // frame, for a hit. `hitApplied` makes the penalty one-time per hazard (gannFan
+  // keys it per-line since a fan has five; wall keys it on the hazard itself since
+  // it only has one collidable band) — unlike a single-column candle, a hazard can
+  // sit inside its hitbox for many consecutive frames, and this isn't a per-column
+  // event to key a `resolved` flag off. Every hit applies the same -3-tick
+  // (leverage-scaled) penalty as a candle "hit" via applyPnlDelta() — reusing the
+  // exact scoring pathway bars already use, so the round win/lose model stays
+  // exactly as it was (out of scope here, per the ticket).
+  // M5b: each type gets its own SoundFX cue — wallHit() here, distinct from
+  // hazardHit() (Gann fan) and bump() (candles), per the ticket's "don't make
+  // every hazard sound identical" instruction.
   function resolveHazards(){
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
@@ -1147,7 +1256,7 @@
       if (hit){
         hit.hitApplied = true;
         applyPnlDelta(-3);
-        SoundFX.hazardHit();
+        SoundFX[hz.type === "wall" ? "wallHit" : "hazardHit"]();
         spawnFloatText("-3", "#ff6b5c", true);
       }
     }
@@ -1181,6 +1290,7 @@
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
       if (hz.type === "gannFan") drawGannFan(ctx, cam, w, hz);
+      else if (hz.type === "wall") drawWall(ctx, cam, w, hz);
     }
   }
 
@@ -1220,6 +1330,28 @@
       }
       ctx.globalAlpha = 1;
     }
+  }
+
+  // M5b: reuses the ladder's exact dashed-entry-line technique (see ladderRowY's
+  // ENTRY marker in drawLadder()) — same setLineDash([3,3]) beam, same red/green
+  // hostile-vs-passable convention every other hazard/candle uses, plus a text
+  // label so the market-metaphor reading (RESISTANCE overhead / SUPPORT underfoot)
+  // is legible at a glance, not just inferable from color.
+  function drawWall(ctx, cam, w, hz){
+    if (hz.xEnd < cam || hz.xStart > cam+w) return; // fully off-screen
+    var x0 = Math.max(hz.xStart, cam) - cam, x1 = Math.min(hz.xEnd, cam+w) - cam;
+    var y = hz.beamY;
+    ctx.strokeStyle = hz.hostile ? "#ff6b5c" : "#6ef2a0";
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = hz.hostile ? .9 : .4;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = hz.hostile ? "#ff6b5c" : "#7fa38c";
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    var label = hz.role === "resistance" ? "RESISTANCE" : "SUPPORT";
+    ctx.fillText(label, x0+6, hz.role === "resistance" ? y-6 : y+14);
   }
 
   function drawTerrain(cam, idx){
