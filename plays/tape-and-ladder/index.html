@@ -142,6 +142,19 @@
   .hud .up{color:var(--phosphor);}
   .hud .down{color:var(--down);}
 
+  /* M5.5: always-visible core-loop statement — deliberately NOT gated behind the
+     H help overlay, per playtester feedback that the loop wasn't legible without
+     digging for it. Lives above the canvas, visible from frame one (including
+     during setup, since direction is already assigned by then). */
+  .loopCue{
+    padding:8px 14px 0;
+    font-size:.78rem;
+    letter-spacing:.02em;
+    color:var(--muted);
+  }
+  .loopCue .up{color:var(--phosphor);}
+  .loopCue .down{color:var(--down);}
+
   footer{
     max-width:1040px;
     width:100%;
@@ -263,6 +276,7 @@
   <div class="panels">
     <section class="panel">
       <h2>TERRAIN &mdash; <span>the tape you run</span></h2>
+      <p class="loopCue" id="loopCue"></p>
       <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="360" aria-label="Candle terrain runner"></canvas></div>
       <div class="hud">
         <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
@@ -422,7 +436,24 @@
       jump: function(){ tone(520, 0.09, {type:"square", slideTo:780, gain:0.11}); },
       land: function(){ noiseBurst(0.08, {cutoff:220, gain:0.18}); },
       climbStep: function(){ tone(920, 0.045, {type:"triangle", gain:0.08}); },
-      bump: function(){ noiseBurst(0.07, {cutoff:140, gain:0.16}); tone(90, 0.09, {type:"sawtooth", gain:0.08}); },
+      // M5.5: playtester feedback asked for a sound that clearly reads as "I just
+      // got hit by a hostile candle." The old bump() (low-cutoff noise + a quiet
+      // 90Hz tone) was too close in timbre to land()'s dull, low-cutoff thump —
+      // both are short low-pass noise bursts, and landing happens constantly
+      // during normal play, so a hit could pass as just another landing. Brighter
+      // noise (1100Hz cutoff, sharper "crack" instead of a dull thud) plus a
+      // longer descending buzz makes it unambiguously distinct from land() and
+      // reads as clearly negative, mirroring jump()'s ascending tone in reverse.
+      bump: function(){ noiseBurst(0.09, {cutoff:1100, gain:0.2}); tone(180, 0.16, {type:"sawtooth", slideTo:70, gain:0.13}); },
+      // M5.5: a hazard hit (Gann fan line, and any future M5b type) gets its own
+      // cue — same "unambiguously bad" register as bump() but a different timbre
+      // (square instead of sawtooth) and a two-stage descending buzz, so a hazard
+      // hit doesn't sound identical to a candle hit either.
+      hazardHit: function(){
+        noiseBurst(0.1, {cutoff:1400, gain:0.2});
+        tone(140, 0.2, {type:"square", slideTo:55, gain:0.14});
+        setTimeout(function(){ tone(100, 0.14, {type:"square", slideTo:40, gain:0.1}); }, 90);
+      },
       spreadCross: function(){
         if (!enabled) return;
         var notes = [660, 880, 1320];
@@ -510,9 +541,19 @@
   var pnlTicks = 0;
   var banner = null;            // {text, color, until}
   var helpOpen = false;
+  // M5.5: per-event PnL-cause callouts (see spawnFloatText()) — distinct from
+  // `banner`, which is reserved for whole-round events (win/stop-out). These are
+  // small and numerous by design: the point is to visibly tie each PnL change to
+  // the exact candle/hazard that caused it, so "why did my PnL move?" has an
+  // on-screen answer even when no jump was involved.
+  var floatingTexts = [];
 
   function resetRun(){
     round = 1; score = 0;
+    // M5.5: a brand new run should feel like a first run again — restart the
+    // scroll-speed ramp from its slow start rather than carrying over whatever
+    // speed the previous run had reached.
+    rampDistancePx = 0; scrollSpeed = SCROLL_SPEED_START;
     document.getElementById("gameOverOverlay").hidden = true;
     document.getElementById("goSubmit").disabled = false;
     newRound();
@@ -562,7 +603,17 @@
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
   // canvas, instead of the player moving through a fixed world. `scrollSpeed` is a
   // mutable var (not a caps constant) because later milestones ramp it over time.
-  var scrollSpeed = 200;
+  // M5.5: playtester feedback ("they go too fast") pulls a minimal version of that
+  // ramp forward from M7 — scrollSpeed now starts at SCROLL_SPEED_START and eases up
+  // to SCROLL_SPEED_MAX over the first SCROLL_RAMP_DISTANCE_PX of actual "running"
+  // distance (setup-phase background generation doesn't count — nothing is visible
+  // then, so it shouldn't burn ramp budget). `rampDistancePx` resets on a brand new
+  // run (resetRun()) but NOT every round, so banking a limit and continuing doesn't
+  // re-punish the player with a slow crawl — only round/obstacleThreshold() difficulty
+  // ramps per round, same as before this milestone.
+  var SCROLL_SPEED_MAX = 200, SCROLL_SPEED_START = 130, SCROLL_RAMP_DISTANCE_PX = 2200;
+  var scrollSpeed = SCROLL_SPEED_START;
+  var rampDistancePx = 0;
   // Dino-style hold-to-charge jump: a tap always gets the full JUMP_V impulse (a
   // guaranteed minimum hop), but holding through the ascent keeps gravity reduced
   // for a short window so the arc visibly extends. Release, or hitting the max hold
@@ -931,6 +982,13 @@
       player.vy += GRAVITY*dt;
     }
 
+    // M5.5: advance the ramp with last frame's speed, then recompute this frame's
+    // speed from the new distance — only while actually running (see the var
+    // declaration above for why setup-phase time doesn't count).
+    if (phase === "running") rampDistancePx += scrollSpeed*dt;
+    var rampT = clamp(rampDistancePx / SCROLL_RAMP_DISTANCE_PX, 0, 1);
+    scrollSpeed = SCROLL_SPEED_START + (SCROLL_SPEED_MAX - SCROLL_SPEED_START)*rampT;
+
     // Auto-scroll: no directional input drives this anymore — player.x and cam both
     // advance at scrollSpeed every frame, world-scrolling past a screen-fixed player.
     // No more upper-bound clamp (M2 removes the fixed-world boundary); the lower
@@ -1016,13 +1074,31 @@
     checkRoundOutcome();
   }
 
+  // M5.5: spawns a small, short-lived label at the player's current screen
+  // position — playtester feedback ("I'm being rewarded for jumping?") traced to
+  // there being no on-screen answer to "why did my PnL just move." resolveBar()
+  // only calls this at the exact moment a bar resolves (on contact for a hit, or
+  // right as the player clears it), so player.x/y is a good proxy for "the candle
+  // that just caused this." `big` marks the jump-dependent obstacle outcomes
+  // (+2/-3 — drawn larger, held longer) apart from the ambient drift that happens
+  // just from being in a favorable/adverse position without jumping at all (+1/-1
+  // — drawn smaller, briefer) — the callout's own size is the cue that distinguishes
+  // "this one needed a jump" from "this one didn't."
+  function spawnFloatText(text, color, big){
+    floatingTexts.push({
+      text: text, color: color, big: !!big,
+      x: player.x, y: player.y - 6,
+      startedAt: performance.now(), duration: big ? 750 : 420
+    });
+  }
+
   function resolveBar(b, kind){
     b.resolved = true;
     var delta = 0;
-    if (kind === "hit"){ delta = -3; SoundFX.bump(); }
-    else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); }
-    else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
-    else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); }
+    if (kind === "hit"){ delta = -3; SoundFX.bump(); spawnFloatText("-3", "#ff6b5c", true); }
+    else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); spawnFloatText("+2", "#6ef2a0", true); }
+    else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); spawnFloatText("+1", "#6ef2a0", false); }
+    else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); spawnFloatText("-1", "#ff6b5c", false); }
     applyPnlDelta(delta);
   }
 
@@ -1061,6 +1137,9 @@
   // penalty as a candle "hit" via applyPnlDelta() — reusing the exact scoring
   // pathway bars already use, so the round win/lose model stays exactly as it was
   // (out of scope here, per the ticket).
+  // M5.5: hazard hits now play SoundFX.hazardHit() instead of the candle's bump() —
+  // a distinct cue per the playtester ask, so a Gann-fan line hit doesn't sound
+  // identical to (and get lost among) ordinary candle contact.
   function resolveHazards(){
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
@@ -1068,7 +1147,8 @@
       if (hit){
         hit.hitApplied = true;
         applyPnlDelta(-3);
-        SoundFX.bump();
+        SoundFX.hazardHit();
+        spawnFloatText("-3", "#ff6b5c", true);
       }
     }
   }
@@ -1170,10 +1250,21 @@
         if (!b) continue; // outside the generated/kept window — shouldn't normally happen given the ahead-buffer
         var sx = i*COLW - cam;
         var col = b.bull ? "#6ef2a0" : "#ff6b5c";
-        var bodyPx = clamp((b.top-b.bottom)*MAXH, 4, 85);
+        // M5.5: playtester feedback ("can't see some of these candles") traced in
+        // part to a WYSIWYG gap — an obstacle's drawn body used its own clamp floor
+        // (4px) while its actual jump-clearance hitbox (hurdlePx) used a taller
+        // floor (18px, see classifyBar()), so a barely-qualifying obstacle could be
+        // hit well above where it visibly appeared to end. Obstacles now draw at
+        // exactly hurdlePx — the same number the collision test uses — so what's
+        // shown is what has to be cleared. Non-obstacle bars are unaffected.
+        var bodyPx = b.isObstacle ? b.hurdlePx : clamp((b.top-b.bottom)*MAXH, 4, 85);
         var topY = baseline - bodyPx;
 
-        ctx.globalAlpha = b.isObstacle ? 1 : .45;
+        // M5.5: non-obstacle (ambient) bars were dimmed enough (.45/.3) that
+        // playtesters read them as hard to see, not just intentionally de-emphasized.
+        // Raised both alphas a step — still clearly duller than a full-opacity,
+        // white-outlined obstacle, just no longer washed out against --void.
+        ctx.globalAlpha = b.isObstacle ? 1 : .58;
         ctx.fillStyle = col;
         ctx.fillRect(sx+3, topY, COLW-6, bodyPx);
         if (b.isObstacle){
@@ -1182,7 +1273,7 @@
           ctx.lineWidth = 1.5;
           ctx.strokeRect(sx+3, topY, COLW-6, bodyPx);
         }
-        ctx.globalAlpha = b.isObstacle ? .7 : .3;
+        ctx.globalAlpha = b.isObstacle ? .7 : .42;
         ctx.strokeStyle = col;
         var wickPx = bodyPx + (b.wickHi-b.top)*MAXH*0.6;
         ctx.beginPath();
@@ -1225,6 +1316,25 @@
     ctx.fillRect(px, player.y, PLAYER_W, PLAYER_H);
     ctx.shadowBlur = 0;
 
+    // M5.5: prune expired PnL-cause callouts (see spawnFloatText()) and draw the
+    // still-live ones, rising and fading over their lifetime. World-space x so they
+    // scroll with the tape like everything else they're labeling.
+    var ftNow = performance.now();
+    for (var ftI = floatingTexts.length - 1; ftI >= 0; ftI--){
+      if (ftNow - floatingTexts[ftI].startedAt > floatingTexts[ftI].duration) floatingTexts.splice(ftI, 1);
+    }
+    ctx.textAlign = "center";
+    for (var ftJ = 0; ftJ < floatingTexts.length; ftJ++){
+      var ft = floatingTexts[ftJ];
+      var age = (ftNow - ft.startedAt) / ft.duration; // 0..1
+      ctx.globalAlpha = 1 - age;
+      ctx.font = (ft.big ? "bold 18px" : "13px") + " 'VT323', monospace";
+      ctx.fillStyle = ft.color;
+      ctx.fillText(ft.text, ft.x - cam, ft.y - age*16);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = "left";
+
     if (banner && performance.now() < banner.until){
       ctx.font = "bold 30px 'VT323', monospace";
       ctx.fillStyle = banner.color;
@@ -1252,6 +1362,16 @@
     toLimitEl.textContent = limitTicks != null ? Math.max(0, limitTicks - pnlTicks) : "—";
     document.getElementById("roundVal").textContent = round;
     document.getElementById("scoreVal").textContent = score;
+
+    // M5.5: always-visible core-loop statement (see .loopCue in <style> for why
+    // this isn't gated behind Help). Candle color (bull=green/bear=red) is fixed
+    // regardless of direction — only which color is hostile depends on it — so
+    // this has to be recomputed from the live `direction`, not hardcoded copy.
+    var hostileWord = direction === "LONG" ? "red" : "green";
+    var favorableWord = direction === "LONG" ? "green" : "red";
+    document.getElementById("loopCue").innerHTML = direction +
+      " &mdash; dodge <span class=\"down\">" + hostileWord + "</span> candles (contact costs PnL) &middot; " +
+      "<span class=\"up\">" + favorableWord + "</span> ones pay you just for passing under them, no jump needed.";
   }
 
   // ----------------------------------------------------------------- LADDER
@@ -1389,6 +1509,7 @@
     resetTerrainPlayerVerticals();
     phase = "setup";
     banner = null;
+    floatingTexts.length = 0; // M5.5: don't carry stale PnL-cause callouts across a round boundary
     updateHud();
   }
 
