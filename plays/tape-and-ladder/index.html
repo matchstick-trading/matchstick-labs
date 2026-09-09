@@ -472,6 +472,16 @@
       tunnelGraze: function(){
         noiseBurst(0.04, {cutoff:2200, gain:0.12});
       },
+      // M5b: news-spike gap fall — the "biggest" hazard cue in the set (it's the
+      // one -3 event that also removes solid ground out from under the player, not
+      // just a hurdle/beam miss), so it's deliberately the longest and the only one
+      // built around a real descending pitch slide rather than a short thud/buzz —
+      // a literal "falling" sound, distinct from hazardHit()'s two-stage descending
+      // buzz (Gann fan), wallHit()'s single blunt knock, and bump()'s bright crack.
+      gapFall: function(){
+        tone(300, 0.35, {type:"sawtooth", slideTo:60, gain:0.18});
+        noiseBurst(0.25, {cutoff:350, gain:0.22});
+      },
       spreadCross: function(){
         if (!enabled) return;
         var notes = [660, 880, 1320];
@@ -638,10 +648,27 @@
   var TUNNEL_WIDTH_PX = 640;
   var TUNNEL_GRAZE_PENALTY = 1, TUNNEL_GRAZE_COOLDOWN_MS = 180;
 
+  // M5b hazard 3: news-spike gap. The tape's baseline itself drops away — ground
+  // presence becomes x-dependent (see the physics exception in updateTerrain()),
+  // not an AABB/line hit test like every other hazard/candle. GAP_FALL_DEPTH_PX is
+  // how far below baseline the player must sink while still over an unresolved gap
+  // before it counts as "fell in" — kept well inside BASE_MARGIN (26px) so the
+  // stumble is visible on-canvas, never clipped. GAP_VOID_HEIGHT_PX is sized to
+  // fully cover the tallest possible bar (85px clamp ceiling + wick, see
+  // classifyBar()/drawTerrain()) so nothing appears to float above the void.
+  var GAP_FALL_DEPTH_PX = 20;
+  // Gap width sits GAP_WIDTH_BIAS of the way from a tap jump's horizontal carry to
+  // a held jump's — see gapWidthPx() — rather than a flat multiplier on one of
+  // them, so it's derived from (and stays correct against) both real airtimes,
+  // not just one plus an independently-guessed margin.
+  var GAP_WIDTH_BIAS = 0.35;
+  var GAP_VOID_HEIGHT_PX = 100;
+  var GAP_NEWS_LEAD_PX = 90; // how far before xStart the telegraph candle sits
+
   // M5b: which hazard types the streaming spawner can pick from — extend this list
   // (not ensureHazardsSpawned()'s loop shape) as each new M5b type lands, per the
   // ticket's "reuse the pattern without restructuring it" instruction.
-  var HAZARD_TYPES = ["gannFan", "wall", "tunnel"];
+  var HAZARD_TYPES = ["gannFan", "wall", "tunnel", "gap"];
 
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
@@ -1050,6 +1077,87 @@
   function tunnelUpperY(hazard, worldX){ return tunnelCenterY(hazard, worldX) - tunnelHalfGapPx(hazard, worldX); }
   function tunnelLowerY(hazard, worldX){ return tunnelCenterY(hazard, worldX) + tunnelHalfGapPx(hazard, worldX); }
 
+  // ------------------------------------------------------------ HAZARDS (M5b #3)
+  // Real projectile-motion airtime for each jump variant, derived directly from
+  // the same GRAVITY/JUMP_V/JUMP_HOLD_MAX_MS/JUMP_HOLD_GRAVITY_MULT constants
+  // updateTerrain() itself uses to move the player — not independently-tuned
+  // magic numbers — so gap sizing (see spawnGap()) automatically stays correct if
+  // jump physics are ever retuned, rather than silently drifting out of sync.
+  function tapJumpAirtimeS(){
+    // Full gravity the whole arc (a tap releases immediately, so extendingHold
+    // never applies): time to return to launch height is -2*v0/g.
+    return -2*JUMP_V/GRAVITY;
+  }
+  function heldJumpAirtimeS(){
+    var holdT = JUMP_HOLD_MAX_MS/1000;
+    var accelHold = GRAVITY*JUMP_HOLD_GRAVITY_MULT;
+    // Upward speed remaining exactly when the hold window ends (still ascending
+    // the whole window with the current tuning — see the commit message for the
+    // numeric check — so this is normally positive).
+    var vUpAtHoldEnd = -JUMP_V - accelHold*holdT;
+    if (vUpAtHoldEnd <= 0){
+      // Defensive fallback only: if constants are ever retuned so the hold window
+      // outlasts the ascent, solve directly within the reduced-gravity phase
+      // instead of assuming a separate full-gravity descent phase exists.
+      return -2*JUMP_V/accelHold;
+    }
+    var heightAtHoldEnd = -JUMP_V*holdT - 0.5*accelHold*holdT*holdT;
+    var tUpAfterHold = vUpAtHoldEnd/GRAVITY;
+    var peakHeight = heightAtHoldEnd + (vUpAtHoldEnd*vUpAtHoldEnd)/(2*GRAVITY);
+    var tDown = Math.sqrt(2*peakHeight/GRAVITY);
+    return holdT + tUpAfterHold + tDown;
+  }
+
+  // News-spike gap width is a function of CURRENT scrollSpeed, not a fixed pixel
+  // value — uniquely among M5b hazards, whether this one is fair depends on
+  // *time* to cross, not just position, and scrollSpeed keeps ramping for a long
+  // stretch of a run (see SCROLL_SPEED_START/MAX/SCROLL_RAMP_DISTANCE_PX). A gap
+  // is spawned up to HAZARD_SPAWN_AHEAD_PX + a screen-width ahead of the camera —
+  // several real seconds before the player actually reaches it — so baking the
+  // width in once at spawn time, from whatever scrollSpeed happened to be at that
+  // moment, can go stale: scrollSpeed may ramp up substantially in between,
+  // making a width sized for an earlier, slower speed clearable by a mere tap
+  // jump once the player actually arrives at (now-faster) full speed. So `xEnd`
+  // is instead refreshed every frame from the LIVE scrollSpeed (see
+  // updateGapWidths(), called from updateTerrain() right after this frame's
+  // scrollSpeed ramp update, before the ground-check that reads it) — always
+  // reflecting "is this fair right now," not "was this fair back when spawned."
+  // Sits GAP_WIDTH_BIAS of the way between a tap jump's horizontal carry
+  // (scrollSpeed*tapJumpAirtimeS()) and a held jump's (scrollSpeed*
+  // heldJumpAirtimeS()) — closer to the tap side, so a tap jump reliably falls
+  // short (~9% short at GAP_WIDTH_BIAS=0.35) while a held jump reliably clears it
+  // (~15% to spare) — true at every scrollSpeed the ramp can produce, since both
+  // carries scale linearly with scrollSpeed, so the fraction between them (and
+  // therefore both margins) stays constant regardless of which speed the gap is
+  // encountered at (see the commit message for the numeric check at both ramp
+  // extremes). `newsX` is the oversized decorative telegraph candle's position
+  // (see drawGap()) — not a bars[] entry, so it can't desync
+  // MIN_OBSTACLE_GAP_COLS/lastObstacleAbsI's generation-time sequencing.
+  function gapWidthPx(){
+    var tapCarry = scrollSpeed * tapJumpAirtimeS();
+    var heldCarry = scrollSpeed * heldJumpAirtimeS();
+    return tapCarry + (heldCarry - tapCarry) * GAP_WIDTH_BIAS;
+  }
+
+  function spawnGap(xStart){
+    hazards.push({
+      type: "gap",
+      xStart: xStart, xEnd: xStart + gapWidthPx(),
+      newsX: xStart - GAP_NEWS_LEAD_PX,
+      fallResolved: false
+    });
+  }
+
+  // Called once per frame (see updateTerrain()): keeps every live gap's `xEnd` in
+  // sync with the current scrollSpeed, not just whatever it was at spawn time —
+  // see spawnGap()'s comment for why a one-time bake-in would go stale.
+  function updateGapWidths(){
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      if (hz.type === "gap") hz.xEnd = hz.xStart + gapWidthPx();
+    }
+  }
+
   // Keeps the next hazard spawned ~HAZARD_SPAWN_AHEAD_PX past the camera's leading
   // edge, same "stay filled ahead of the frontier" shape as ensureBarsGenerated(),
   // decoupled onto its own world-pixel cadence and its own RNG draws (gap size).
@@ -1061,6 +1169,7 @@
     var kind = HAZARD_TYPES[Math.floor(rand()*HAZARD_TYPES.length)];
     if (kind === "wall") spawnWall(worldX);
     else if (kind === "tunnel") spawnTunnel(worldX);
+    else if (kind === "gap") spawnGap(worldX);
     else spawnGannFan(worldX);
   }
 
@@ -1099,10 +1208,12 @@
     var lockoutEnd = player.x + LADDER_FLIP_LOCKOUT_AHEAD*COLW;
     for (var i=0;i<hazards.length;i++){
       var hz = hazards[i];
-      // M5b: the tunnel isn't direction-conditional at all (see spawnTunnel()'s
-      // comment) — nothing to reclassify, so it's skipped before the band check
-      // below even bothers looking at fields it doesn't have.
-      if (hz.type === "tunnel") continue;
+      // M5b: neither the tunnel (see spawnTunnel()'s comment) nor the gap (a
+      // structural ground-presence effect, not a direction-conditional hostility
+      // flag — see spawnGap()'s comment) has anything to reclassify, so both are
+      // skipped before the band check below even bothers looking at fields they
+      // don't have.
+      if (hz.type === "tunnel" || hz.type === "gap") continue;
       // Each type's own collidable band, not the generic xStart/xEnd — matches the
       // pre-existing gannFan behavior (core band only; the cosmetic fade tail was
       // never part of the lockout check) and gives wall an equivalently precise
@@ -1148,6 +1259,10 @@
         if (hzShift.type === "tunnel"){
           for (var sI=0; sI<hzShift.samples.length; sI++) hzShift.samples[sI].absIndex -= REBASE_BAR_SHIFT;
         }
+        // Gap's telegraph candle is its own extra world-space x, same reasoning as
+        // tunnel's samples above — a field the generic xStart/xEnd branch doesn't
+        // know about.
+        if (hzShift.type === "gap") hzShift.newsX -= REBASE_SHIFT_PX;
       }
       nextHazardX -= REBASE_SHIFT_PX;
     }
@@ -1176,6 +1291,21 @@
     player.vy = 0;
     player.onGround = true;
     jumpHoldMs = 0;
+  }
+
+  // M5b #3: is any live (not yet fallResolved — see updateTerrain()'s ground
+  // check) gap hazard currently under the player's full body width? A structural
+  // ground-presence query, not a per-frame hit test dispatched through
+  // testHazardCollision() like every other hazard — the gap has no "hit," it
+  // just removes the floor.
+  function activeGapAt(){
+    var px0 = player.x - PLAYER_W/2, px1 = player.x + PLAYER_W/2;
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      if (hz.type !== "gap" || hz.fallResolved) continue;
+      if (px1 > hz.xStart && px0 < hz.xEnd) return hz;
+    }
+    return null;
   }
 
   function updateTerrain(dt){
@@ -1208,6 +1338,10 @@
     if (phase === "running") rampDistancePx += scrollSpeed*dt;
     var rampT = clamp(rampDistancePx / SCROLL_RAMP_DISTANCE_PX, 0, 1);
     scrollSpeed = SCROLL_SPEED_START + (SCROLL_SPEED_MAX - SCROLL_SPEED_START)*rampT;
+    // M5b #3: refresh every live gap's width from this frame's just-updated
+    // scrollSpeed, before the ground-check below reads it — see spawnGap()'s
+    // comment for why a value baked in once at spawn time would go stale.
+    updateGapWidths();
 
     // Auto-scroll: no directional input drives this anymore — player.x and cam both
     // advance at scrollSpeed every frame, world-scrolling past a screen-fixed player.
@@ -1219,7 +1353,42 @@
     player.y += player.vy*dt;
 
     var baseline = baselineY();
-    if (player.y + PLAYER_H >= baseline && player.vy >= 0){
+    // M5b #3: the gap's physics exception. Every other hazard is a hit test
+    // layered on top of unmodified ground physics; the gap instead makes ground
+    // presence itself x-dependent — while the player's body is over a live gap,
+    // the normal "snap to baseline" landing check below never fires at all, so
+    // gravity just keeps pulling them down through where the floor would be. This
+    // isn't a bespoke "did they jump in time" check: whether that ends in a clean
+    // landing on the far ledge or a fall-in penalty falls straight out of real
+    // projectile motion (see tapJumpAirtimeS()/heldJumpAirtimeS() and spawnGap()) —
+    // a tap jump's shorter hang time means player.x carries past xEnd only after
+    // GAP_FALL_DEPTH_PX has already been crossed (fall-in); a held jump's longer
+    // hang time means player.x is already past xEnd, so gapHere is null again,
+    // before that depth is ever reached (clean landing, ground check resumes
+    // normally on the far ledge).
+    var gapHere = activeGapAt();
+    if (gapHere){
+      if (player.y + PLAYER_H >= baseline + GAP_FALL_DEPTH_PX){
+        // Fell in: never had enough horizontal carry to clear it. One-time
+        // penalty via the same applyPnlDelta() pathway every other hazard uses
+        // (hitApplied-style — fallResolved makes this a single event, not a
+        // repeated one like the tunnel's graze), then an immediate "climbed back
+        // out" recovery: stumble, not stuck — no softlock, the run keeps moving,
+        // and the rest of this same gap's span behaves like solid ground again.
+        gapHere.fallResolved = true;
+        applyPnlDelta(-3);
+        SoundFX.gapFall();
+        spawnFloatText("-3", "#ff6b5c", true);
+        player.y = baseline - PLAYER_H;
+        player.vy = 0;
+        player.onGround = true;
+      } else {
+        // Still over the void and hasn't sunk past the grace depth yet — no
+        // ground here regardless of y/vy, whether still rising, falling, or (if
+        // never jumped at all) just beginning to sink from a stationary start.
+        player.onGround = false;
+      }
+    } else if (player.y + PLAYER_H >= baseline && player.vy >= 0){
       player.y = baseline - PLAYER_H;
       player.vy = 0;
       player.onGround = true;
@@ -1455,6 +1624,7 @@
       if (hz.type === "gannFan") drawGannFan(ctx, cam, w, hz);
       else if (hz.type === "wall") drawWall(ctx, cam, w, hz);
       else if (hz.type === "tunnel") drawTunnel(ctx, cam, w, hz);
+      else if (hz.type === "gap") drawGap(ctx, cam, w, hz);
     }
   }
 
@@ -1561,6 +1731,65 @@
       if (first){ ctx.moveTo(x-cam, y); first = false; } else ctx.lineTo(x-cam, y);
     }
     ctx.lineTo(x1-cam, yFn(hz, x1));
+    ctx.stroke();
+  }
+
+  // M5b #3: the gap is not a testHazardCollision() participant at all (see
+  // activeGapAt()/updateTerrain()) — this hazard's only presence in the shared
+  // dispatch pattern is spawning/streaming/rendering; its actual "hit test" is
+  // structural ground-presence, resolved directly inside updateTerrain().
+  //
+  // Visual: the void itself uses the --void token verbatim (per the ticket) — a
+  // near-background fill, not a bright warning color, because the real legibility
+  // cue here is the red rim outline plus the preceding telegraph candle, not fill
+  // contrast (contrast with LEGIBILITY carried over from M5.5's WYSIWYG push: the
+  // void's rim is drawn at the exact xStart/xEnd the collision math uses, same
+  // "what's shown is what's live" discipline as the obstacle-body/hurdlePx fix).
+  // No red/green hostile-vs-passable convention (unlike wall) — a gap is equally
+  // dangerous regardless of direction, so a neutral warning red rim is used
+  // instead of a direction-conditional color.
+  function drawGap(ctx, cam, w, hz){
+    var baseline = baselineY();
+    // News-candle telegraph: an oversized, decorative-only glyph — not a bars[]
+    // entry (see spawnGap()'s comment) — sitting just before the void so the
+    // player has fair warning before it's ever in a jump-reaction window. Checked
+    // and drawn independently of the void's own on-screen test below, since the
+    // telegraph can be visible while the void itself is still off-screen (that's
+    // the whole point — advance warning) and vice versa once the player is past it.
+    if (hz.newsX >= cam-COLW && hz.newsX <= cam+w+COLW){
+      var nx = hz.newsX - cam;
+      var newsH = 150; // taller than any possible ordinary bar (85px clamp ceiling + wick)
+      ctx.fillStyle = "#ffe58a";
+      ctx.globalAlpha = .85;
+      ctx.fillRect(nx-7, baseline-newsH, 14, newsH);
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 1;
+      ctx.strokeRect(nx-7, baseline-newsH, 14, newsH);
+      ctx.fillStyle = "#ffe58a";
+      ctx.font = "10px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("NEWS", nx, baseline-newsH-6);
+      ctx.textAlign = "left";
+    }
+
+    if (hz.xEnd < cam || hz.xStart > cam+w) return; // void itself fully off-screen
+    var x0 = Math.max(hz.xStart, cam) - cam, x1 = Math.min(hz.xEnd, cam+w) - cam;
+    // The void overlay: baselineY()'s stripe (drawn once, full-width, earlier in
+    // drawTerrain()) and any ordinary candle that would otherwise land in this
+    // span get painted over here — the same painter's-algorithm layering every
+    // other drawHazards() call already relies on, rather than teaching
+    // bars[]/drawTerrain about gaps directly (which would entangle with
+    // MIN_OBSTACLE_GAP_COLS/lastObstacleAbsI's generation-time sequencing —
+    // exactly what spawnGap()'s decorative-telegraph design avoids too).
+    ctx.fillStyle = "#0a0f0c"; // --void
+    ctx.globalAlpha = 1;
+    ctx.fillRect(x0, baseline-GAP_VOID_HEIGHT_PX, x1-x0, GAP_VOID_HEIGHT_PX + (tSurf.h-baseline));
+    ctx.strokeStyle = "#ff6b5c";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, baseline-GAP_VOID_HEIGHT_PX); ctx.lineTo(x0, tSurf.h);
+    ctx.moveTo(x1, baseline-GAP_VOID_HEIGHT_PX); ctx.lineTo(x1, tSurf.h);
     ctx.stroke();
   }
 
