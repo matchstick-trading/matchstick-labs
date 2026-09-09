@@ -1,0 +1,14 @@
+name = "matchstick-labs-leaderboard-api"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "matchstick-labs-db"
+database_id = "73ea36be-1dfa-4f99-a6d2-c4f4d8777fbd"
+
+[vars]
+ALLOWED_ORIGINS = "https://matchstick-labs.pages.dev"
+MAX_SCORE = "100000000"
+MAX_INITIALS_LEN = "4"
+DEFAULT_LIMIT = "10"

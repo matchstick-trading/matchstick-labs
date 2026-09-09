@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>matchstick-labs — plays</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b0d10;
+    color: #e8e6e1;
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { max-width: 560px; padding: 2rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.sub { color: #9a9a9a; margin-top: 0; }
+  ul { list-style: none; padding: 0; margin-top: 2rem; }
+  li { margin-bottom: 0.75rem; }
+  a.play {
+    display: block;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid #2a2d33;
+    border-radius: 8px;
+    color: #e8e6e1;
+    text-decoration: none;
+    background: #14171c;
+    transition: border-color 0.15s ease;
+  }
+  a.play:hover { border-color: #5b7cff; }
+  a.play .name { font-weight: 600; }
+  a.play .desc { color: #9a9a9a; font-size: 0.9rem; }
+  footer { margin-top: 2rem; font-size: 0.8rem; color: #6a6a6a; }
+  footer a { color: #6a6a6a; }
+</style>
+</head>
+<body>
+<main>
+  <h1>matchstick-labs</h1>
+  <p class="sub">Playful R&amp;D and control-scheme experiments. Not the Matchstick Replay product.</p>
+  <ul>
+    <li>
+      <a class="play" href="./tape-and-ladder/">
+        <div class="name">Tape &amp; Ladder</div>
+        <div class="desc">Run the tape, climb the ladder, don't get stopped out.</div>
+      </a>
+    </li>
+  </ul>
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">source on github</a>
+  </footer>
+</main>
+</body>
+</html>
