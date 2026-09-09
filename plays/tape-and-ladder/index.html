@@ -552,7 +552,11 @@
   // bars[0], `barsGenIndex` the absolute index of the next bar to generate.
   // `barLevel`/`lastObstacleAbsI` are the generator's persistent carry-state,
   // continuous across round transitions (see ensureBarsGenerated()).
+  // `barsClassifiedUpTo` is M3's carry-state: the absolute index below which every
+  // bar has already had its favorable/isObstacle classification resolved exactly
+  // once, in order (see classifyBar()/barAt()).
   var bars = [], barsBaseIndex = 0, barsGenIndex = 0, barLevel = 0.5, lastObstacleAbsI = -999;
+  var barsClassifiedUpTo = 0;
   var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
   var basePrice = 100 + Math.floor(rand()*40);
   var lastCam = 0, lastIdx = 0;
@@ -568,9 +572,14 @@
   }
 
   // Generates one bar at absolute index `barsGenIndex`, appends it to the window,
-  // and advances the generator's persistent carry-state (barLevel, obstacle spacing).
-  // Same per-bar math as the old one-shot genBars() loop body — only the framing
-  // changed, from "build all 420 up front" to "append one more as needed".
+  // and advances the generator's persistent carry-state (barLevel). Same per-bar
+  // candle math as the old one-shot genBars() loop body, but M3 narrows what gets
+  // baked in here to the candle's own intrinsic properties — open/close/wick
+  // geometry, `bull` (up/down candle), and `bigEnough` (whether this bar's body
+  // clears the obstacle-size threshold in effect right now). None of that depends
+  // on the player's trade direction, so it's still fine to fix it at generation
+  // time. `favorable`/`isObstacle`/`hurdlePx` — which DO depend on `direction` —
+  // are deliberately NOT computed here anymore; see classifyBar().
   function genNextBar(threshold){
     var open = barLevel;
     var step = (rand()-0.5)*0.085;
@@ -583,19 +592,33 @@
     var wickLo = Math.max(0.01, bottom - rand()*0.05);
     var bull = close >= open;
     var bodyMag = top - bottom;
-    var favorable = (direction === "LONG") ? bull : !bull;
-    var isObstacle = !favorable && bodyMag >= threshold;
-    if (isObstacle){
-      if (barsGenIndex - lastObstacleAbsI < MIN_OBSTACLE_GAP_COLS) isObstacle = false;
-      else lastObstacleAbsI = barsGenIndex;
-    }
-    var hurdlePx = isObstacle ? clamp(bodyMag*MAXH, 18, 85) : 0;
     bars.push({
       open:open, close:close, top:top, bottom:bottom, wickHi:wickHi, wickLo:wickLo,
-      bull:bull, favorable:favorable, isObstacle:isObstacle, hurdlePx:hurdlePx,
-      sampled: (barsGenIndex % 3 === 0), resolved:false
+      bull:bull, bodyMag:bodyMag, bigEnough: bodyMag >= threshold,
+      sampled: (barsGenIndex % 3 === 0), resolved:false, classified:false,
+      favorable:false, isObstacle:false, hurdlePx:0
     });
     barsGenIndex++;
+  }
+
+  // M3: favorable/isObstacle/hurdlePx move from generation-time to resolve-time —
+  // computed here against whichever `direction` is CURRENT right now, not whatever
+  // it was back when the bar was generated (contrast with genNextBar(), which no
+  // longer touches `direction` at all). Called from ensureBarsClassified() below,
+  // exactly once per bar, in ascending index order — MIN_OBSTACLE_GAP_COLS's
+  // spacing state (lastObstacleAbsI) is inherently sequential, so "classify once,
+  // in true order" is load-bearing, not just an optimization.
+  function classifyBar(b, absIndex){
+    var favorable = (direction === "LONG") ? b.bull : !b.bull;
+    var isObstacle = !favorable && b.bigEnough;
+    if (isObstacle){
+      if (absIndex - lastObstacleAbsI < MIN_OBSTACLE_GAP_COLS) isObstacle = false;
+      else lastObstacleAbsI = absIndex;
+    }
+    b.favorable = favorable;
+    b.isObstacle = isObstacle;
+    b.hurdlePx = isObstacle ? clamp(b.bodyMag*MAXH, 18, 85) : 0;
+    b.classified = true;
   }
 
   // Keeps ~GEN_AHEAD_BARS generated past the camera's leading (right) edge. Runs
@@ -611,6 +634,34 @@
     }
   }
 
+  // M3: classifies every generated-but-not-yet-classified bar, in ascending order,
+  // every frame — same unconditional-of-round-phase cadence as ensureBarsGenerated
+  // (called right after it in updateTerrain()), and deliberately NOT deferred to
+  // whenever a bar first happens to be drawn or scanned near the player. Judgment
+  // call: a bar-first-looked-at-on-screen design was tried and rejected — since
+  // drawTerrain's on-screen sweep (and resolveObstacles' scan) are both gated off
+  // during "setup," bars generated while the player is still deliberating over
+  // STOP/LIMIT would never advance lastObstacleAbsI's gap-spacing sequence at all
+  // under that design, diverging from the pre-M3 build (which classified
+  // unconditionally at generation time, setup or not) — caught by the A/B
+  // regression check described in the commit message. Keeping classification's
+  // cadence tied to generation, not to rendering/scanning, preserves the exact
+  // same gap-spacing sequence while still moving the actual favorable/isObstacle
+  // computation to a separate step that reads `direction` fresh each time (not
+  // baked into genNextBar). The tradeoff: a mid-run `direction` change (M4) will
+  // immediately affect any not-yet-*generated* bar, not every not-yet-*visible*
+  // one — a bar already generated+classified a few seconds before the player
+  // reaches it keeps its classification. That boundary redefinition, if a
+  // tighter one is wanted, is left for M4.
+  function ensureBarsClassified(){
+    while (barsClassifiedUpTo < barsGenIndex){
+      var rel = barsClassifiedUpTo - barsBaseIndex;
+      if (rel < 0 || rel >= bars.length) break; // shouldn't happen given the generation-ahead buffer
+      classifyBar(bars[rel], barsClassifiedUpTo);
+      barsClassifiedUpTo++;
+    }
+  }
+
   // Drops bars once they've scrolled well behind the camera, keeping the live
   // window bounded in size no matter how long the run goes. DROP_MARGIN_BARS
   // covers drawTerrain's own -1 lookback so nothing still on-screen gets dropped.
@@ -623,7 +674,9 @@
   }
 
   // Maps an absolute bar-index to its live bar object, or null if it's outside the
-  // currently-generated/kept window (already dropped, or not generated yet).
+  // currently-generated/kept window (already dropped, or not generated yet). Every
+  // in-window bar returned here has already been classified — see
+  // ensureBarsClassified(), which keeps pace with generation every frame.
   function barAt(absIndex){
     var rel = absIndex - barsBaseIndex;
     if (rel < 0 || rel >= bars.length) return null;
@@ -643,6 +696,7 @@
       barsBaseIndex -= REBASE_BAR_SHIFT;
       barsGenIndex -= REBASE_BAR_SHIFT;
       lastObstacleAbsI -= REBASE_BAR_SHIFT;
+      barsClassifiedUpTo -= REBASE_BAR_SHIFT;
     }
   }
 
@@ -714,12 +768,16 @@
       player.onGround = false;
     }
 
-    // M2 streaming terrain: rebase first (so generation/dropping below operate on
-    // already-rebased coordinates), then keep the window filled ahead of the camera
-    // and drop what's scrolled behind. All three run every frame regardless of round
-    // phase, so the tape keeps scrolling and generating independent of round state.
+    // M2/M3 streaming terrain: rebase first (so generation/classification/dropping
+    // below all operate on already-rebased coordinates), then keep the window
+    // filled ahead of the camera, classify whatever that just generated, and drop
+    // what's scrolled behind. All four run every frame regardless of round phase,
+    // so the tape keeps scrolling, generating, and classifying independent of
+    // round state (see ensureBarsClassified()'s comment for why classification's
+    // cadence is tied to generation rather than to drawing/scanning).
     maybeRebaseWorld();
     ensureBarsGenerated();
+    ensureBarsClassified();
     dropOldBars();
 
     var idx = terrainIndexAt(player.x);
