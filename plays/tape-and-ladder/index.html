@@ -546,6 +546,18 @@
   // multiple of COLW so every world-space pixel position (i*COLW - cam) comes out
   // bit-for-bit identical before and after — no jump/flicker on the rebase frame.
   var REBASE_BAR_SHIFT = Math.round(100000/COLW), REBASE_SHIFT_PX = REBASE_BAR_SHIFT*COLW;
+
+  // M5a: hazards are a second, independent streaming window alongside `bars` — same
+  // spawn-ahead/drop-behind shape as the bar stream (see ensureHazardsSpawned()/
+  // dropOldHazards()), but on its own world-pixel cadence rather than per-column,
+  // since a hazard isn't confined to one COLW-wide slot the way a candle is.
+  var HAZARD_MIN_GAP_PX = 900, HAZARD_MAX_GAP_PX = 1500; // world-space distance between pivots
+  var HAZARD_SPAWN_AHEAD_PX = 700; // keep the next hazard spawned at least this far ahead of the camera
+  var HAZARD_DROP_MARGIN_PX = 60;  // trailing buffer before a fully-scrolled-past hazard is dropped
+  var GANN_CORE_WIDTH_PX = 420;    // solid + collidable for this many px past the pivot
+  var GANN_FADE_WIDTH_PX = 140;    // then a cosmetic-only fade tail (no collision) before it's gone
+  var GANN_HIT_THICKNESS_PX = 6;   // point-to-line collision tolerance
+
   var GRAVITY = 1500, JUMP_V = -580;
   // M1 auto-scroll: the world moves past a player fixed near the left third of the
   // canvas, instead of the player moving through a fixed world. `scrollSpeed` is a
@@ -571,6 +583,9 @@
   // once, in order (see classifyBar()/barAt()).
   var bars = [], barsBaseIndex = 0, barsGenIndex = 0, barLevel = 0.5, lastObstacleAbsI = -999;
   var barsClassifiedUpTo = 0;
+  // M5a: hazards persist across round boundaries the same way `bars` does (never
+  // cleared by newRound()/resetRun() — see the M2 continuous-tape precedent).
+  var hazards = [], nextHazardX = 1500;
   var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
   var basePrice = 100 + Math.floor(rand()*40);
   var lastCam = 0, lastIdx = 0;
@@ -750,6 +765,102 @@
     return bars[rel];
   }
 
+  // ------------------------------------------------------------ HAZARDS (M5a)
+  // Gann fan: 5 lines fan out from a pivot at the canonical Gann angles. Judgment
+  // call on which of the 5 slope up vs down: a textbook Gann fan draws every line
+  // in ONE direction (e.g. all rising, from a chart low) — faithful to that, but
+  // useless here, since hostility is per-line and direction-conditional the same
+  // way a candle's favorable/isObstacle is (see classifyHazardLines()): if every
+  // line slopes the same way, the whole fan is uniformly hostile or uniformly
+  // passable for a given direction, and "the gap between two adjacent hostile
+  // lines" — the actual hazard, per the ticket — never occurs. So this fan
+  // deliberately splits the 5 canonical ratios across both slope directions —
+  // 1x1/2x1/4x1 rising, 1x2/1x4 falling — so a genuine mix of hostile and
+  // passable lines (and real gaps between them) exists within one fan instance,
+  // regardless of which direction the player is currently in.
+  function spawnGannFan(pivotX){
+    var pivotY = baselineY() - (60 + rand()*120); // mid-air, within normal jump range
+    var hazard = {
+      type: "gannFan",
+      pivotX: pivotX, pivotY: pivotY,
+      coreWidthPx: GANN_CORE_WIDTH_PX,
+      fadeWidthPx: GANN_FADE_WIDTH_PX,
+      lines: [
+        { ratio:"1x1", slope: 1,     hostile:false, hitApplied:false },
+        { ratio:"2x1", slope: 2,     hostile:false, hitApplied:false },
+        { ratio:"4x1", slope: 4,     hostile:false, hitApplied:false },
+        { ratio:"1x2", slope: -0.5,  hostile:false, hitApplied:false },
+        { ratio:"1x4", slope: -0.25, hostile:false, hitApplied:false }
+      ]
+    };
+    classifyHazardLines(hazard);
+    hazards.push(hazard);
+  }
+
+  // M3/M4 pattern reused for a second hazard type: each line's slope is intrinsic
+  // (fixed at spawn, like a candle's `bull`), hostility is resolved against
+  // whichever `direction` is CURRENT right now (like a candle's `favorable`).
+  // Positive slope = line rises (price up) as world-x increases; LONG wants price
+  // up, so a rising line is favorable/passable for LONG and hostile for SHORT,
+  // mirrored for a falling line.
+  function classifyHazardLines(hazard){
+    for (var i=0;i<hazard.lines.length;i++){
+      var ln = hazard.lines[i];
+      var rising = ln.slope > 0;
+      var favorable = (direction === "LONG") ? rising : !rising;
+      ln.hostile = !favorable;
+    }
+  }
+
+  // y of a single fan line at a given world-x. Only meaningful for worldX >=
+  // hazard.pivotX — lines only extend forward from the pivot, per the ticket.
+  function gannLineY(hazard, line, worldX){
+    return hazard.pivotY - line.slope*(worldX - hazard.pivotX);
+  }
+
+  // Keeps the next hazard spawned ~HAZARD_SPAWN_AHEAD_PX past the camera's leading
+  // edge, same "stay filled ahead of the frontier" shape as ensureBarsGenerated(),
+  // decoupled onto its own world-pixel cadence and its own RNG draws (gap size).
+  // Runs every frame regardless of round phase, same as the bar stream.
+  function ensureHazardsSpawned(){
+    var frontierX = cam + tSurf.w + HAZARD_SPAWN_AHEAD_PX;
+    while (nextHazardX < frontierX){
+      spawnGannFan(nextHazardX);
+      nextHazardX += HAZARD_MIN_GAP_PX + rand()*(HAZARD_MAX_GAP_PX-HAZARD_MIN_GAP_PX);
+    }
+  }
+
+  // Mirrors dropOldBars(): hazards are pushed in ascending pivotX order, so once
+  // the oldest one has fully scrolled (core + fade) behind the camera, it's safe
+  // to drop from the front.
+  function dropOldHazards(){
+    var keepFromX = cam - HAZARD_DROP_MARGIN_PX;
+    while (hazards.length > 0 && (hazards[0].pivotX + hazards[0].coreWidthPx + hazards[0].fadeWidthPx) < keepFromX){
+      hazards.shift();
+    }
+  }
+
+  // M4's flip-reclassification pattern, reused rather than reinvented (per the
+  // ticket): same LADDER_FLIP_LOCKOUT_BEHIND/AHEAD knob as reclassifyUnresolvedBars(),
+  // converted from bar-index space to world-pixel space via COLW so both share one
+  // tunable value. The difference from bars: a fan line has no discrete "resolved"
+  // flag to protect (collision here is a continuous, every-frame point-to-line
+  // test, not a once-per-column event), so what the lockout protects isn't "an
+  // already-scored outcome" but "a line currently inside the player's immediate
+  // collision-test zone" — any hazard whose live band overlaps that zone is left
+  // alone on this flip; anything fully outside it (ahead or already behind) is
+  // free to reclassify against the new direction.
+  function reclassifyHazards(){
+    var lockoutStart = player.x - LADDER_FLIP_LOCKOUT_BEHIND*COLW;
+    var lockoutEnd = player.x + LADDER_FLIP_LOCKOUT_AHEAD*COLW;
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      var bandStart = hz.pivotX, bandEnd = hz.pivotX + hz.coreWidthPx;
+      if (bandEnd >= lockoutStart && bandStart <= lockoutEnd) continue; // frozen: overlaps this frame's collision zone
+      classifyHazardLines(hz);
+    }
+  }
+
   // Periodic coordinate rebase (M2): once cam crosses REBASE_SHIFT_PX, subtract the
   // same COLW-aligned amount from every world-space coordinate/index counter in one
   // frame, so nothing keeps growing unbounded across a long session. Because the
@@ -764,6 +875,10 @@
       barsGenIndex -= REBASE_BAR_SHIFT;
       lastObstacleAbsI -= REBASE_BAR_SHIFT;
       barsClassifiedUpTo -= REBASE_BAR_SHIFT;
+      // M5a: hazards carry their own world-space x (pivotX), not a bar-index, so
+      // they shift by the raw pixel amount rather than REBASE_BAR_SHIFT.
+      for (var hzR=0; hzR<hazards.length; hzR++) hazards[hzR].pivotX -= REBASE_SHIFT_PX;
+      nextHazardX -= REBASE_SHIFT_PX;
     }
   }
 
@@ -846,6 +961,10 @@
     ensureBarsGenerated();
     ensureBarsClassified();
     dropOldBars();
+    // M5a: hazards stream independently of bars (own cadence, own array) but follow
+    // the exact same "run every frame regardless of phase" rule.
+    ensureHazardsSpawned();
+    dropOldHazards();
 
     var idx = terrainIndexAt(player.x);
     return {idx:idx, cam:cam};
@@ -889,6 +1008,14 @@
   // resolution time — bigger swings up AND down, not just a directional safety net.
   // Explicitly not touching the win/lose thresholds themselves (checkRoundOutcome
   // still compares raw pnlTicks against stopTicks/limitTicks) — that model is M6.
+  // M5a: factored the leverage-scaled apply-and-check step out into applyPnlDelta()
+  // so hazards (and any future M5b type) share the exact same PnL pathway instead
+  // of duplicating it at every call site.
+  function applyPnlDelta(delta){
+    pnlTicks += delta * leverage;
+    checkRoundOutcome();
+  }
+
   function resolveBar(b, kind){
     b.resolved = true;
     var delta = 0;
@@ -896,8 +1023,54 @@
     else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); }
     else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
     else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); }
-    pnlTicks += delta * leverage;
-    checkRoundOutcome();
+    applyPnlDelta(delta);
+  }
+
+  // ------------------------------------------------------------- HAZARDS (M5a)
+  // Generic per-hazard collision hook (per the ticket): each hazard type
+  // implements its own test, dispatched by `type` here rather than as a method on
+  // the hazard object (hazards are plain data objects, same shape as `bars`
+  // entries) — a new `case` covers each of M5b's remaining hazard types later
+  // without touching resolveHazards()'s scan loop below.
+  function testHazardCollision(hazard, player){
+    if (hazard.type === "gannFan") return testGannFanCollision(hazard, player);
+    return null;
+  }
+
+  // Point-to-line distance test, not AABB (per the ticket) — the player has to
+  // find the gap between two adjacent hostile lines, not just clear a box. Only
+  // tests within the hazard's solid core band; the fade tail is cosmetic-only
+  // (see drawGannFan()), so nothing collides there.
+  function testGannFanCollision(hazard, player){
+    if (player.x < hazard.pivotX || player.x > hazard.pivotX + hazard.coreWidthPx) return null;
+    var centerY = player.y + PLAYER_H/2;
+    for (var i=0;i<hazard.lines.length;i++){
+      var ln = hazard.lines[i];
+      if (!ln.hostile || ln.hitApplied) continue;
+      var lineY = gannLineY(hazard, ln, player.x);
+      if (Math.abs(centerY - lineY) < GANN_HIT_THICKNESS_PX) return ln;
+    }
+    return null;
+  }
+
+  // Analogous to resolveObstacles(): scans every currently-live hazard, once per
+  // frame, for a hostile-line hit. `hitApplied` makes the penalty one-time per
+  // line — unlike a single-column candle, a shallow fan line can sit inside the
+  // hitbox for many consecutive frames, and this isn't a per-column event to key
+  // a `resolved` flag off. A hit applies the same -3-tick (leverage-scaled)
+  // penalty as a candle "hit" via applyPnlDelta() — reusing the exact scoring
+  // pathway bars already use, so the round win/lose model stays exactly as it was
+  // (out of scope here, per the ticket).
+  function resolveHazards(){
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      var hit = testHazardCollision(hz, player);
+      if (hit){
+        hit.hitApplied = true;
+        applyPnlDelta(-3);
+        SoundFX.bump();
+      }
+    }
   }
 
   function checkRoundOutcome(){
@@ -920,6 +1093,53 @@
     banner = { text: "STOPPED OUT", color: "#ff6b5c", until: performance.now()+1000 };
     var msg = DEATH_MESSAGES[Math.floor(Math.random()*DEATH_MESSAGES.length)];
     setTimeout(function(){ showGameOver(msg); }, 1050);
+  }
+
+  // Dispatch-by-type, mirroring testHazardCollision() — one place to add a new
+  // `case` per M5b hazard type later.
+  function drawHazards(ctx, cam, w){
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      if (hz.type === "gannFan") drawGannFan(ctx, cam, w, hz);
+    }
+  }
+
+  // Reuses the candle wick's drawing style (thin colored stroke, globalAlpha for
+  // danger-vs-decorative weight — see the wick draw in drawTerrain()) rather than
+  // inventing a new rendering primitive. Hostile lines use the same red/green
+  // convention as bull/bear candles, at higher alpha, same relationship as
+  // isObstacle vs. ambient candles. The core band draws solid; the fade tail is a
+  // second, dimmer stroke rather than a true per-pixel alpha gradient — a
+  // deliberately simple approximation of "fading out" (M5a is explicitly the
+  // template milestone; a real gradient stroke can be added later if a hazard
+  // type actually needs one).
+  function drawGannFan(ctx, cam, w, hz){
+    var bandEndAll = hz.pivotX + hz.coreWidthPx + hz.fadeWidthPx;
+    if (bandEndAll < cam || hz.pivotX > cam+w) return; // fully off-screen
+    for (var i=0;i<hz.lines.length;i++){
+      var ln = hz.lines[i];
+      ctx.strokeStyle = ln.hostile ? "#ff6b5c" : "#6ef2a0";
+      ctx.lineWidth = 1.5;
+
+      var coreX0 = Math.max(hz.pivotX, cam), coreX1 = Math.min(hz.pivotX+hz.coreWidthPx, cam+w);
+      if (coreX1 > coreX0){
+        ctx.globalAlpha = ln.hostile ? .9 : .35;
+        ctx.beginPath();
+        ctx.moveTo(coreX0-cam, gannLineY(hz, ln, coreX0));
+        ctx.lineTo(coreX1-cam, gannLineY(hz, ln, coreX1));
+        ctx.stroke();
+      }
+
+      var fadeX0 = Math.max(hz.pivotX+hz.coreWidthPx, cam), fadeX1 = Math.min(bandEndAll, cam+w);
+      if (fadeX1 > fadeX0){
+        ctx.globalAlpha = ln.hostile ? .35 : .14;
+        ctx.beginPath();
+        ctx.moveTo(fadeX0-cam, gannLineY(hz, ln, fadeX0));
+        ctx.lineTo(fadeX1-cam, gannLineY(hz, ln, fadeX1));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
   }
 
   function drawTerrain(cam, idx){
@@ -978,6 +1198,9 @@
           ctx.globalAlpha = 1;
         }
       }
+      // M5a: hazards are part of "the tape" the same way bars are, so they share
+      // the setup-phase blind-commit gate above rather than getting their own.
+      drawHazards(ctx, cam, w);
     } else {
       // Setup phase: a round isn't locked in yet. The tape stays hidden on purpose —
       // placement can't be biased by seeing it first — even though (as of M2) bars are
@@ -1117,6 +1340,7 @@
     if (direction !== prevDirection){
       SoundFX.spreadCross(); // reuse the existing "crossed the spread" cue for a flip
       reclassifyUnresolvedBars();
+      reclassifyHazards(); // M5a: same live-flip treatment, reusing the same lockout pattern
     }
   }
 
@@ -1436,7 +1660,7 @@
     if (!helpOpen && phase !== "gameover"){
       var t = updateTerrain(dt);
       lastCam = t.cam; lastIdx = t.idx;
-      if (phase === "running") resolveObstacles();
+      if (phase === "running"){ resolveObstacles(); resolveHazards(); }
     }
     drawTerrain(lastCam, lastIdx);
     drawLadder();
