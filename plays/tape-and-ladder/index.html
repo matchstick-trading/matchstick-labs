@@ -360,7 +360,16 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  var rand = mulberry32(Date.now() & 0xffffffff);
+  // Harness support: `?seed=N` on the URL pins the PRNG for reproducible, comparable
+  // runs across an evaluation set (see scripts/autoplay-eval.mjs) — falls back to the
+  // original Date.now() source for ordinary play, so this has no effect on a normal
+  // visit. `runSeed` is exposed below via window.__tapeAndLadder for the harness to
+  // log alongside a run's result.
+  var runSeed = (function(){
+    var m = /[?&]seed=(\d+)/.exec(location.search);
+    return m ? (Number(m[1]) >>> 0) : (Date.now() & 0xffffffff);
+  })();
+  var rand = mulberry32(runSeed);
 
   // -------------------------------------------------------------- SOUND FX
   var SoundFX = (function(){
@@ -559,6 +568,11 @@
 
   var phase = "setup";          // setup -> running -> gameover
   var direction = "LONG";       // this run's assigned side
+  // Harness support: tags the source of the most recent *negative* PnL hit (a
+  // hazard type, or "candle" for a plain obstacle) — see applyPnlDelta(). Purely
+  // diagnostic (read by window.__tapeAndLadder.getState() below as `deathCause`
+  // once a margin call lands); nothing in scoring or gameplay reads this.
+  var lastHitSource = null;
   // M4: 1x-8x, set by ladder rung distance from entry while running. M6: also the
   // player's chosen starting rung, confirmed during setup (see confirmStartingLeverage()).
   var leverage = 1;
@@ -1512,7 +1526,7 @@
         // out" recovery: stumble, not stuck — no softlock, the run keeps moving,
         // and the rest of this same gap's span behaves like solid ground again.
         gapHere.fallResolved = true;
-        applyPnlDelta(-3);
+        applyPnlDelta(-3, "gap");
         SoundFX.gapFall();
         spawnFloatText("-3", "#ff6b5c", true);
         player.y = baseline - PLAYER_H;
@@ -1606,10 +1620,13 @@
   // (see checkMarginCall()) — every PnL change also updates hwmTicks, the running
   // high-water-mark that both the live CUSHION readout and the final score are
   // computed from.
-  function applyPnlDelta(delta){
+  function applyPnlDelta(delta, source){
     pnlTicks += delta * leverage;
     hwmTicks = Math.max(hwmTicks, pnlTicks);
     equity = BASE_EQUITY + pnlTicks;
+    // Harness support: `source` is optional and only ever read for diagnostics
+    // (see lastHitSource's declaration comment) — omitting it changes nothing.
+    if (delta < 0 && source) lastHitSource = source;
     checkMarginCall();
   }
 
@@ -1638,7 +1655,7 @@
     else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); spawnFloatText("+2", "#6ef2a0", true); }
     else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); spawnFloatText("+1", "#6ef2a0", false); }
     else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); spawnFloatText("-1", "#ff6b5c", false); }
-    applyPnlDelta(delta);
+    applyPnlDelta(delta, "candle");
   }
 
   // ------------------------------------------------------------- HAZARDS (M5a)
@@ -1760,12 +1777,12 @@
       if (!hit) continue;
       if (hz.type === "tunnel"){
         hz.lastGrazeAt = performance.now();
-        applyPnlDelta(-TUNNEL_GRAZE_PENALTY);
+        applyPnlDelta(-TUNNEL_GRAZE_PENALTY, "tunnel");
         SoundFX.tunnelGraze();
         spawnFloatText("-1", "#ffb454", false);
       } else {
         hit.hitApplied = true;
-        applyPnlDelta(-3);
+        applyPnlDelta(-3, hz.type);
         var hitSound = hz.type === "wall" ? "wallHit" : (hz.type === "volSpikes" ? "bump" : "hazardHit");
         SoundFX[hitSound]();
         spawnFloatText("-3", "#ff6b5c", true);
@@ -2316,6 +2333,7 @@
     pnlTicks = 0;
     hwmTicks = 0;
     equity = BASE_EQUITY;
+    lastHitSource = null; // harness support: don't carry a stale deathCause into a new run
     phase = "running";
     // M6: `leverage` and ladderPlayer.idx are already whatever the player just
     // confirmed in confirmStartingLeverage() above — no more hardcoding leverage=1
@@ -2327,7 +2345,11 @@
   }
 
   function newRound(){
-    direction = Math.random() < 0.5 ? "LONG" : "SHORT";
+    // Harness support: draws from the seeded `rand()` stream, not Math.random() —
+    // otherwise a pinned `?seed=` still couldn't reproduce a run, since the very
+    // first thing a run does is an unseeded coin flip. No behavior change for
+    // ordinary play (still an even coin flip either way).
+    direction = rand() < 0.5 ? "LONG" : "SHORT";
     leverage = 1;
     pnlTicks = 0;
     genLevels();
@@ -2581,6 +2603,57 @@
     else if (action === "confirm") bindTap(btnEl, function(){ if (phase === "setup") confirmStartingLeverage(); });
     else if (action === "restart") bindTap(btnEl, function(){ resetRun(); });
   });
+
+  // ------------------------------------------------------------- TEST HARNESS
+  // Exposes read-only state (plus the run's seed) for a scripted autoplay bot and
+  // objective, repeatable scoring — see scripts/autoplay-eval.mjs. A bot drives the
+  // game through the exact same trusted-feeling KeyboardEvent path a human does
+  // (window's real keydown/keyup listeners, dispatched via Playwright's
+  // page.keyboard — see doLadderMove()/the keydown handler above); nothing here
+  // reads or short-circuits any gameplay code, so this has zero effect on normal
+  // play and can't itself change what a policy is allowed to do. `getState()` is
+  // cheap enough to poll every frame: no allocation beyond one lookahead array per
+  // call, no DOM reads.
+  window.__tapeAndLadder = {
+    seed: runSeed,
+    getState: function(){
+      var centerIdx = player ? terrainIndexAt(player.x) : 0;
+      var upcomingObstacles = [];
+      if (player){
+        for (var i = centerIdx; i <= centerIdx + 24; i++){
+          var b = barAt(i);
+          if (b && b.isObstacle && !b.resolved){
+            upcomingObstacles.push({ worldX: i*COLW, hurdlePx: b.hurdlePx });
+          }
+        }
+      }
+      var upcomingHazards = [];
+      for (var h = 0; h < hazards.length; h++){
+        var hz = hazards[h];
+        if (player && hz.xEnd < player.x) continue; // already behind the player
+        upcomingHazards.push({ type: hz.type, xStart: hz.xStart, xEnd: hz.xEnd });
+      }
+      return {
+        phase: phase,
+        direction: direction,
+        leverage: leverage,
+        pnlTicks: pnlTicks,
+        hwmTicks: hwmTicks,
+        equity: equity,
+        cushionRemaining: phase === "running" ? marginCushionRemainingTicks() : null,
+        rampDistancePx: rampDistancePx,
+        scrollSpeed: scrollSpeed,
+        cam: cam,
+        playerX: player ? player.x : null,
+        playerY: player ? player.y : null,
+        onGround: player ? player.onGround : null,
+        ladderIdx: ladderPlayer.idx,
+        deathCause: phase === "gameover" ? lastHitSource : null,
+        upcomingObstacles: upcomingObstacles,
+        upcomingHazards: upcomingHazards
+      };
+    }
+  };
 
   // ------------------------------------------------------------------ LOOP
   newRound();
