@@ -546,7 +546,27 @@
   });
 
   // ------------------------------------------------------------- GAME STATE
-  var MIN_OBSTACLE_GAP_COLS = 5;     // no two jump-obstacles closer than this, at any difficulty
+  // M10: raised 5 -> 6, and the exact value is load-bearing. A tap jump's airtime is
+  // -2*JUMP_V/GRAVITY = 0.773s (see tapJumpAirtimeS()), so the ground it covers is
+  // 0.773 * scrollSpeed: 101px at SCROLL_SPEED_START, 193px at SCROLL_SPEED_MAX.
+  // That matters because updateTerrain() only converts `jumpQueued` into an impulse
+  // when `player.onGround` — a jump pressed mid-air is silently *dropped*, not
+  // buffered. So whenever two obstacles are closer than one airtime, a player who
+  // jumps once per obstacle loses the second input: they press jump, nothing
+  // happens, they take -3. The skilled answer is to clear the pair with a single
+  // arc, which is always available (at 144px apart and top speed the arc is still
+  // 85px up when the second obstacle arrives, above the 85px hurdle ceiling) — so
+  // this is a timing test, not a wall.
+  // At the old 5 columns (120px) that test was live at every speed including the
+  // opening, where the tape is slow enough that the pair reads as two separate
+  // obstacles and the one-arc answer isn't visually obvious — which is exactly the
+  // "too punishing early" complaint. 6 columns (144px) puts the minimum spacing
+  // outside a tap-jump carry at the speeds the early game actually runs at, and back
+  // inside it once the tape is fast, so the trap survives as late-game difficulty
+  // instead of greeting a first-time player. (7 columns was tried and rejected
+  // against the harness: it removed the test at every speed and, with the rest of
+  // this pass, made the run effectively survivable forever.)
+  var MIN_OBSTACLE_GAP_COLS = 6;     // no two jump-obstacles closer than this, at any difficulty
   var DEATH_MESSAGES = [
     "Leverage didn't care how good the setup looked.",
     "Risk was defined the moment you set it, not when it happened.",
@@ -667,9 +687,23 @@
   // dropOldHazards()), but on its own world-pixel cadence rather than per-column,
   // since a hazard isn't confined to one COLW-wide slot the way a candle is.
   var HAZARD_MIN_GAP_PX = 900, HAZARD_MAX_GAP_PX = 1500; // world-space distance between pivots
+  // M10: hazard spacing now ramps the same way obstacle density does, instead of
+  // sitting at its final value from the first hazard onward. The opening of a run
+  // was asking the player to read a brand-new hazard shape every ~1200px while they
+  // were still learning the candle rhythm; this stretches the early spacing by
+  // HAZARD_EARLY_GAP_MULT and eases back to the base 900-1500 band over
+  // HAZARD_GAP_RAMP_DISTANCE_PX. The late-game band is deliberately unchanged — this
+  // only buys room at the start, it doesn't lower the ceiling.
+  var HAZARD_EARLY_GAP_MULT = 1.35;
+  var HAZARD_GAP_RAMP_DISTANCE_PX = 4000;
   var HAZARD_SPAWN_AHEAD_PX = 700; // keep the next hazard spawned at least this far ahead of the camera
   var HAZARD_DROP_MARGIN_PX = 60;  // trailing buffer before a fully-scrolled-past hazard is dropped
-  var GANN_CORE_WIDTH_PX = 420;    // solid + collidable for this many px past the pivot
+  // M10: 420 -> 360. Every hostile fan line that crosses the player's running height
+  // inside the collidable core is its own separate, unsignposted -3 timing event, and
+  // a SHORT run faces three of them (the 1x1/2x1/4x1 rising lines) inside one fan.
+  // Shortening the core trims the expected number of those crossings per fan without
+  // touching the mechanic itself.
+  var GANN_CORE_WIDTH_PX = 400;    // solid + collidable for this many px past the pivot
   var GANN_FADE_WIDTH_PX = 140;    // then a cosmetic-only fade tail (no collision) before it's gone
   var GANN_HIT_THICKNESS_PX = 6;   // point-to-line collision tolerance
 
@@ -679,8 +713,28 @@
   // the jump button through it doesn't); a support beam sits low (hurdle — same
   // 18-85px scale a candle obstacle's hurdlePx uses) and must be jumped over like an
   // ordinary obstacle. Both widths randomize a bit like Gann's pivotY does.
-  var WALL_RESISTANCE_CLEARANCE_PX = 150, WALL_SUPPORT_HURDLE_PX = 60;
-  var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;
+  // M10 fairness fix. The comment above says a support beam "must be jumped over
+  // like an ordinary obstacle" — at the shipped constants it could not be, ever.
+  // Clearing a support beam means keeping the player's *bottom edge* above beamY for
+  // the beam's whole width, and the widest span a jump can hold above a 60px beam is
+  // 69px (tap) / 100px (held) at SCROLL_SPEED_START, rising to 105/153px at
+  // SCROLL_SPEED_MAX. The beam was 260-420px wide. So a hostile support wall was a
+  // guaranteed, unavoidable -3 every time one spawned — roughly a quarter of all
+  // walls (50% support x 50% of runs in the direction that makes support hostile).
+  // Fix, in two parts: (1) width is now role-dependent, since only the support role
+  // has to be crossed airborne — a resistance beam is a ceiling, where width only
+  // decides how long you must stay low, which is always possible, so it keeps the
+  // original wide span; (2) the support hurdle drops to 30px, still inside the same
+  // 18-85px scale a candle obstacle's hurdlePx uses, just at the forgiving end.
+  // At 30px the jump holds above the beam for 86px (tap) / 113px (held) at the
+  // slowest scroll speed, so the 80-110px support band is clearable at every speed
+  // the ramp produces — but only the very narrowest beams are tap-clearable; most of
+  // the band needs a held jump. Kept deliberately tight against that envelope rather
+  // than made comfortably narrow: a support beam should still cost a player who
+  // reaches for it with a reflex tap instead of committing to the hold.
+  var WALL_RESISTANCE_CLEARANCE_PX = 150, WALL_SUPPORT_HURDLE_PX = 30;
+  var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;             // resistance (ceiling) only
+  var WALL_SUPPORT_MIN_WIDTH_PX = 80, WALL_SUPPORT_MAX_WIDTH_PX = 110; // support (hurdle) only
   var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
 
   // M5b hazard 2: moving-average tunnel. Not direction-conditional (unlike every
@@ -690,9 +744,24 @@
   // frontier and the bar-generation frontier — see spawnTunnel()'s comment) so its
   // MA sampling never needs a not-yet-generated bar.
   var TUNNEL_FAST_WINDOW = 5, TUNNEL_SLOW_WINDOW = 20; // bars
-  var TUNNEL_GAP_WIDE_PX = 80, TUNNEL_GAP_NARROW_PX = 20;
-  var TUNNEL_WIDTH_PX = 640;
-  var TUNNEL_GRAZE_PENALTY = 1, TUNNEL_GRAZE_COOLDOWN_MS = 180;
+  // M10. resolveHazards()'s comment describes the graze as "sustained carelessness
+  // costs more, brief carelessness costs little" — at the shipped constants it was
+  // neither. A -1 every 180ms is -5.6 ticks/second, and the tunnel's centerline is
+  // the bars' own trailing MA, which can sit anywhere from 14px to 216px above the
+  // baseline. Whenever it sat high, no ballistic arc could hold the player inside it
+  // for 640px, so the whole crossing was spent outside: 640px at ramped speed is
+  // ~3.5-4.9s, i.e. -20 to -27 ticks — more than the entire 18-tick cushion at 1x.
+  // One badly-placed tunnel was an unavoidable margin call, not a precision test.
+  // Three changes, all keeping the mechanic intact: the corridor widens (the old
+  // 20px narrow section gave an 18px-tall player ~1px of room on each side), the
+  // span shortens, and the graze cooldown nearly doubles. Worst case — a full-span
+  // miss with the corridor sitting too high to hold — now costs ~9-10 ticks: over
+  // half the 1x cushion, comfortably still the most expensive hazard on the tape to
+  // ignore, and still scaling with how long you stay outside it, but no longer a
+  // guaranteed margin call on its own.
+  var TUNNEL_GAP_WIDE_PX = 120, TUNNEL_GAP_NARROW_PX = 48;
+  var TUNNEL_WIDTH_PX = 520;
+  var TUNNEL_GRAZE_PENALTY = 1, TUNNEL_GRAZE_COOLDOWN_MS = 320;
 
   // M5b hazard 3: news-spike gap. The tape's baseline itself drops away — ground
   // presence becomes x-dependent (see the physics exception in updateTerrain()),
@@ -719,10 +788,28 @@
   // rapid double/triple-hop — not a new height/reach/timing rule, so heights stay
   // in the shorter half of an ordinary obstacle's own 18-85px range (see
   // classifyBar()) rather than inventing a new scale.
-  var VOLSPIKE_COUNT_MIN = 3, VOLSPIKE_COUNT_MAX = 4; // inclusive
+  // M10 fairness fix — this is the first hazard a player ever meets (atPx 0 in
+  // HAZARD_UNLOCK_SCHEDULE), and at the shipped constants it was not clearable at the
+  // speed it first appears. The "rapid double/triple-hop" the comment above describes
+  // isn't physically available: a tap jump is airborne for 0.773s, and the spikes were
+  // 44px apart — 0.34s at SCROLL_SPEED_START — so the player is still in the air over
+  // the next two spikes no matter what they press. A cluster is therefore cleared by
+  // one arc, not by hopping, and it has to *fit* under one arc. It didn't: a 4-spike
+  // cluster spanned 142px, while at SCROLL_SPEED_START a jump only holds above a 50px
+  // spike for 75px (tap) / 104px (held). The opening hazard was an unavoidable -3 to
+  // -6, and it got *easier* as the game sped up (carry scales with scroll speed, the
+  // cluster's px span doesn't) — exactly backwards. Retuned so a cluster fits inside a
+  // single arc at the slowest scroll speed, with the cluster size deciding *which*
+  // arc: at 30px spacing and a 38px height ceiling, a 2-spike cluster (40px span) is
+  // comfortably tap-clearable, a 3-spike (70px) is tap-clearable, and the full
+  // 4-spike (100px) needs a held jump (110px of carry above 38px at SCROLL_SPEED_START
+  // vs. a tap's 82px). So the hazard still punishes reaching for it with the wrong
+  // jump — it just stops being unwinnable. Still a cadence obstacle, still 2-4 bars,
+  // still the same AABB rule as an ordinary candle.
+  var VOLSPIKE_COUNT_MIN = 2, VOLSPIKE_COUNT_MAX = 4; // inclusive
   var VOLSPIKE_WIDTH_PX = 10;    // thin, volume-histogram-style bar
-  var VOLSPIKE_SPACING_PX = 44;  // center-to-center — under 2 columns, well inside MIN_OBSTACLE_GAP_COLS*COLW
-  var VOLSPIKE_MIN_HEIGHT_PX = 18, VOLSPIKE_MAX_HEIGHT_PX = 50;
+  var VOLSPIKE_SPACING_PX = 30;  // center-to-center — under 2 columns, well inside MIN_OBSTACLE_GAP_COLS*COLW
+  var VOLSPIKE_MIN_HEIGHT_PX = 18, VOLSPIKE_MAX_HEIGHT_PX = 38;
 
   // M5b: which hazard types the streaming spawner can pick from — extend this list
   // (not ensureHazardsSpawned()'s loop shape) as each new M5b type lands, per the
@@ -740,7 +827,22 @@
   // then, so it shouldn't burn ramp budget). `rampDistancePx` resets on a brand new
   // run (resetRun()) — there's no more per-round reset now that M6 retired rounds
   // entirely, so this is simply "distance since the run started."
-  var SCROLL_SPEED_MAX = 200, SCROLL_SPEED_START = 130, SCROLL_RAMP_DISTANCE_PX = 2200;
+  // M10: start speed unchanged (130), ceiling raised (200 -> 250), and the ramp to it
+  // stretched (2200 -> 6500). This is the pass's main "harder later, easier earlier"
+  // trade, and it's a single reshaping of one curve rather than two opposed knobs:
+  //   at 1000px:  148 (was 162)   at 2200px: 168 (was 200, i.e. already maxed)
+  //   at 4000px:  204 (was 200)   at 6500px+: 250 (was 200)
+  // The old ramp put the tape at its permanent top speed ~14s into a run, inside the
+  // window a first-time player is still learning to read a hostile candle as a hurdle,
+  // and then never asked for anything faster again. Now the opening is genuinely
+  // slower for longer, and the endgame is 25% faster than the old build ever got.
+  // Speed is the fairest difficulty axis this game has: unlike packing obstacles
+  // closer (bounded by MIN_OBSTACLE_GAP_COLS) or widening a hazard past what a jump
+  // can carry, a faster tape compresses reaction time and raises the rate of ambient
+  // PnL ticks without ever making an individual obstacle unclearable — every hazard's
+  // clearance margin either holds constant or improves with speed (gapWidthPx() is
+  // derived from scrollSpeed; every fixed-px hazard gets *more* jump carry).
+  var SCROLL_SPEED_MAX = 250, SCROLL_SPEED_START = 130, SCROLL_RAMP_DISTANCE_PX = 6500;
   var scrollSpeed = SCROLL_SPEED_START;
   var rampDistancePx = 0;
   // M7: obstacleThreshold() used to step down once per round (see the removed
@@ -750,8 +852,19 @@
   // horizon (OBSTACLE_RAMP_DISTANCE_PX > SCROLL_RAMP_DISTANCE_PX) so obstacle density
   // keeps tightening for a while after scroll speed has already maxed out, instead
   // of both axes of difficulty flatlining at the same instant.
-  var OBSTACLE_THRESHOLD_START = 0.05, OBSTACLE_THRESHOLD_FLOOR = 0.028;
-  var OBSTACLE_RAMP_DISTANCE_PX = 3200;
+  // M10: the ramp is stretched (3200 -> 4200) and the floor is lowered (0.028 ->
+  // 0.022) at the same time, deliberately. Those pull in opposite directions and
+  // that's the point: the complaint was about the *opening*, not the ceiling, so the
+  // tightening is spread over a longer distance while the endgame comes out at least
+  // as dense as it was. The floor drop specifically compensates for
+  // MIN_OBSTACLE_GAP_COLS going 5 -> 6: with a wider minimum spacing, a lower
+  // body-size cutoff is needed to keep obstacles arriving at the same *average* rate
+  // late in a run. Rough check against genNextBar()'s step distribution: at 0.028/5
+  // cols the fully-ramped tape produced an obstacle about every 250px; at 0.022/6
+  // cols it's about every 240px — same late-game rhythm or slightly tighter, with the
+  // unjumpable back-to-back pairs removed from the early speeds.
+  var OBSTACLE_THRESHOLD_START = 0.05, OBSTACLE_THRESHOLD_FLOOR = 0.022;
+  var OBSTACLE_RAMP_DISTANCE_PX = 4200;
   // M7: hazard-type unlock schedule — spawnHazardAt() only draws from types whose
   // `atPx` has been reached by the live `rampDistancePx`, so a first-time player
   // meets one new hazard shape at a time instead of all five (plus plain candles)
@@ -766,12 +879,23 @@
   // scroll-speed and obstacle-density ramps have already maxed out, so there's still
   // something new arriving deep into a long run. First-pass distances, same as every
   // other numeric constant in this file — needs a playtest pass to tune.
+  // M10: same order, same reasoning, every unlock pushed out by 400px. At the old
+  // schedule a player met their second distinct hazard shape by 1400px and their
+  // third by 2800px (~19s), before the scroll ramp had even finished — three shapes
+  // to learn while still learning the candle rhythm. This is deliberately a *shift*
+  // of the whole schedule rather than a stretch of it: an earlier revision of this
+  // pass also spread the later unlocks out (tunnel 5800, gap 8000) and the harness
+  // showed that removed too much of the late-game challenge along with the
+  // early-game crowding. Note these are compared against `rampDistancePx` at *spawn*
+  // time, and a hazard spawns up to a screen-width + HAZARD_SPAWN_AHEAD_PX ahead of
+  // the camera, so the distance at which a player actually *meets* a newly unlocked
+  // type is roughly 1400px further along than the number here.
   var HAZARD_UNLOCK_SCHEDULE = [
     { type: "volSpikes", atPx: 0 },
-    { type: "wall",      atPx: 1400 },
-    { type: "gannFan",   atPx: 2800 },
-    { type: "tunnel",    atPx: 4400 },
-    { type: "gap",       atPx: 6200 }
+    { type: "wall",      atPx: 1800 },
+    { type: "gannFan",   atPx: 3200 },
+    { type: "tunnel",    atPx: 4800 },
+    { type: "gap",       atPx: 6600 }
   ];
   function unlockedHazardTypes(){
     var out = [];
@@ -802,7 +926,10 @@
   var barsClassifiedUpTo = 0;
   // M5a: hazards persist across round boundaries the same way `bars` does (never
   // cleared by newRound()/resetRun() — see the M2 continuous-tape precedent).
-  var hazards = [], nextHazardX = 1500;
+  // M10: first hazard pushed 1500 -> 2400 so the opening stretch of a run is plain
+  // candles only. The player's first job is reading a hostile candle as a hurdle;
+  // that shouldn't have to be learned at the same time as the first hazard shape.
+  var hazards = [], nextHazardX = 2400;
   var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
   var basePrice = 100 + Math.floor(rand()*40);
   var lastCam = 0, lastIdx = 0;
@@ -1054,7 +1181,12 @@
   // the opposite direction, per the ticket.
   function spawnWall(xStart){
     var role = rand() < 0.5 ? "resistance" : "support";
-    var widthPx = WALL_MIN_WIDTH_PX + rand()*(WALL_MAX_WIDTH_PX-WALL_MIN_WIDTH_PX);
+    // M10: role-dependent width — see the WALL_SUPPORT_*_WIDTH_PX comment for why a
+    // support beam can't reuse the resistance beam's span. Same single rand() draw
+    // either way, just against a different band.
+    var widthPx = role === "resistance"
+      ? WALL_MIN_WIDTH_PX + rand()*(WALL_MAX_WIDTH_PX-WALL_MIN_WIDTH_PX)
+      : WALL_SUPPORT_MIN_WIDTH_PX + rand()*(WALL_SUPPORT_MAX_WIDTH_PX-WALL_SUPPORT_MIN_WIDTH_PX);
     // Small jitter around each role's clearance/hurdle height, same spirit as
     // Gann's randomized pivotY — kept inside the margin the physics comment above
     // sized the constants for for (tap jump vs. held jump / stand vs. jump-over).
@@ -1301,11 +1433,22 @@
     else spawnGannFan(worldX);
   }
 
+  // M10: distance-scaled hazard spacing, same shape as obstacleThreshold()'s density
+  // ramp and reading the same `rampDistancePx` (no second distance counter), so both
+  // pacing axes ease in together instead of hazard spacing being at its final value
+  // from the first hazard onward. Multiplies the existing random band rather than
+  // replacing it, so the late-game spacing distribution is exactly what it was.
+  function hazardGapPx(){
+    var t = Math.min(1, rampDistancePx / HAZARD_GAP_RAMP_DISTANCE_PX);
+    var mult = HAZARD_EARLY_GAP_MULT + (1 - HAZARD_EARLY_GAP_MULT)*t;
+    return (HAZARD_MIN_GAP_PX + rand()*(HAZARD_MAX_GAP_PX-HAZARD_MIN_GAP_PX)) * mult;
+  }
+
   function ensureHazardsSpawned(){
     var frontierX = cam + tSurf.w + HAZARD_SPAWN_AHEAD_PX;
     while (nextHazardX < frontierX){
       spawnHazardAt(nextHazardX);
-      nextHazardX += HAZARD_MIN_GAP_PX + rand()*(HAZARD_MAX_GAP_PX-HAZARD_MIN_GAP_PX);
+      nextHazardX += hazardGapPx();
     }
   }
 
