@@ -296,14 +296,14 @@
   </div>
 
   <footer>
-    Synthetic data, regenerates every round &mdash; not wired to any real session or trading system.
+    Synthetic data, regenerates every run &mdash; not wired to any real session or trading system.
   </footer>
 </div>
 
 <div id="helpOverlay" class="overlay" hidden>
   <div class="overlayCard">
     <h2>HOW TO PLAY</h2>
-    <p>Each round you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set your <b>STARTING LEVERAGE</b> (1x-8x) before the tape reveals. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you, and keep adjusting leverage live on the ladder as you go &mdash; crossing entry flips LONG/SHORT. Clear an obstacle for profit, miss it and it costs you. Higher leverage swings your PnL harder both ways and shrinks your margin cushion &mdash; drawdown past that cushion is a <b>MARGIN CALL</b>, and the run is over.</p>
+    <p>Each run you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set your <b>STARTING LEVERAGE</b> (1x-8x) before the tape reveals. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you, and keep adjusting leverage live on the ladder as you go &mdash; crossing entry flips LONG/SHORT. Clear an obstacle for profit, miss it and it costs you. Higher leverage swings your PnL harder both ways and shrinks your margin cushion &mdash; drawdown past that cushion is a <b>MARGIN CALL</b>, and the run is over. The tape gets faster and throws new hazard types at you the further you run.</p>
     <div class="kbrow"><kbd>&larr;</kbd><kbd>&rarr;</kbd> <span>run</span></div>
     <div class="kbrow"><kbd>&uarr;</kbd> <span>jump</span></div>
     <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor &mdash; sets starting leverage before the run, then live leverage (1x-8x) once running; crossing entry flips LONG/SHORT</span></div>
@@ -558,16 +558,10 @@
   var LADDER_FLIP_LOCKOUT_AHEAD = 3;
 
   var phase = "setup";          // setup -> running -> gameover
-  var direction = "LONG";       // this round's assigned side
+  var direction = "LONG";       // this run's assigned side
   // M4: 1x-8x, set by ladder rung distance from entry while running. M6: also the
   // player's chosen starting rung, confirmed during setup (see confirmStartingLeverage()).
   var leverage = 1;
-  // Frozen forever as of M6 — nothing increments it anymore now that a margin call
-  // ends the whole run instead of cycling to a new round. obstacleThreshold() still
-  // reads it for its difficulty ramp; that ramp becoming static until it's replaced
-  // with a distance/time-based one is explicitly M7's job, not fixed here — see the
-  // M6 Status entry.
-  var round = 1;
   // M6: margin-call death model. BASE_EQUITY/BASE_CUSHION are first-pass constants,
   // same as M1's jump physics or M5.5's scroll speed were — need a playtest pass to
   // tune. `equity` is cosmetic/display framing on top of pnlTicks (not itself used in
@@ -591,7 +585,6 @@
   var floatingTexts = [];
 
   function resetRun(){
-    round = 1;
     // M5.5: a brand new run should feel like a first run again — restart the
     // scroll-speed ramp from its slow start rather than carrying over whatever
     // speed the previous run had reached.
@@ -731,12 +724,48 @@
   // to SCROLL_SPEED_MAX over the first SCROLL_RAMP_DISTANCE_PX of actual "running"
   // distance (setup-phase background generation doesn't count — nothing is visible
   // then, so it shouldn't burn ramp budget). `rampDistancePx` resets on a brand new
-  // run (resetRun()) but NOT every round, so banking a limit and continuing doesn't
-  // re-punish the player with a slow crawl — only round/obstacleThreshold() difficulty
-  // ramps per round, same as before this milestone.
+  // run (resetRun()) — there's no more per-round reset now that M6 retired rounds
+  // entirely, so this is simply "distance since the run started."
   var SCROLL_SPEED_MAX = 200, SCROLL_SPEED_START = 130, SCROLL_RAMP_DISTANCE_PX = 2200;
   var scrollSpeed = SCROLL_SPEED_START;
   var rampDistancePx = 0;
+  // M7: obstacleThreshold() used to step down once per round (see the removed
+  // `round` var) — dead weight since M6 retired round-cycling and left it frozen at
+  // 1 forever. Reuses the same `rampDistancePx` the scroll-speed ramp already
+  // tracks rather than inventing a second distance metric, but on its own, longer
+  // horizon (OBSTACLE_RAMP_DISTANCE_PX > SCROLL_RAMP_DISTANCE_PX) so obstacle density
+  // keeps tightening for a while after scroll speed has already maxed out, instead
+  // of both axes of difficulty flatlining at the same instant.
+  var OBSTACLE_THRESHOLD_START = 0.05, OBSTACLE_THRESHOLD_FLOOR = 0.028;
+  var OBSTACLE_RAMP_DISTANCE_PX = 3200;
+  // M7: hazard-type unlock schedule — spawnHazardAt() only draws from types whose
+  // `atPx` has been reached by the live `rampDistancePx`, so a first-time player
+  // meets one new hazard shape at a time instead of all five (plus plain candles)
+  // at once from frame one. Order runs easiest/most candle-like first: volSpikes is
+  // explicitly "mechanically identical to a candle" per its M5b design (see that
+  // hazard's own comment), so it costs nothing new to introduce early; wall
+  // (support/resistance) is a single binary hurdle/ceiling and the most direct tie
+  // to the trader feedback that prompted M5.75/M8; gannFan asks the player to track
+  // a diagonal line instead of a horizontal one; tunnel and gap are held for last —
+  // sustained-precision and stop-dead-and-time-it are the two most punishing/least
+  // forgiving mechanics of the five. All five are reachable well past where the
+  // scroll-speed and obstacle-density ramps have already maxed out, so there's still
+  // something new arriving deep into a long run. First-pass distances, same as every
+  // other numeric constant in this file — needs a playtest pass to tune.
+  var HAZARD_UNLOCK_SCHEDULE = [
+    { type: "volSpikes", atPx: 0 },
+    { type: "wall",      atPx: 1400 },
+    { type: "gannFan",   atPx: 2800 },
+    { type: "tunnel",    atPx: 4400 },
+    { type: "gap",       atPx: 6200 }
+  ];
+  function unlockedHazardTypes(){
+    var out = [];
+    for (var i=0;i<HAZARD_UNLOCK_SCHEDULE.length;i++){
+      if (rampDistancePx >= HAZARD_UNLOCK_SCHEDULE[i].atPx) out.push(HAZARD_UNLOCK_SCHEDULE[i].type);
+    }
+    return out;
+  }
   // Dino-style hold-to-charge jump: a tap always gets the full JUMP_V impulse (a
   // guaranteed minimum hop), but holding through the ascent keeps gravity reduced
   // for a short window so the arc visibly extends. Release, or hitting the max hold
@@ -768,10 +797,12 @@
   var cam = 0;
 
   function obstacleThreshold(){
-    // Difficulty ramp: later rounds pack obstacles closer together by lowering
-    // the body-size cutoff for what counts as a jump obstacle (not by touching
-    // gravity/jump/move speed, which stay exactly as tuned).
-    return Math.max(0.028, 0.05 - 0.0015*(round-1));
+    // M7: difficulty ramp is now continuous over distance-into-the-run, not stepped
+    // once per round (rounds no longer exist as of M6). Packs obstacles closer
+    // together by lowering the body-size cutoff for what counts as a jump obstacle
+    // (not by touching gravity/jump/move speed, which stay exactly as tuned).
+    var t = Math.min(1, rampDistancePx / OBSTACLE_RAMP_DISTANCE_PX);
+    return OBSTACLE_THRESHOLD_START - (OBSTACLE_THRESHOLD_START - OBSTACLE_THRESHOLD_FLOOR)*t;
   }
 
   // Generates one bar at absolute index `barsGenIndex`, appends it to the window,
@@ -1245,7 +1276,10 @@
   // new `if` per hazard type as the rest of M5b lands, same shape as
   // testHazardCollision()/drawHazards()'s dispatch below.
   function spawnHazardAt(worldX){
-    var kind = HAZARD_TYPES[Math.floor(rand()*HAZARD_TYPES.length)];
+    // M7: pick only from hazard types unlocked at the current ramp distance —
+    // volSpikes (atPx 0) is always available so this is never empty.
+    var pool = unlockedHazardTypes();
+    var kind = pool[Math.floor(rand()*pool.length)];
     if (kind === "wall") spawnWall(worldX);
     else if (kind === "tunnel") spawnTunnel(worldX);
     else if (kind === "gap") spawnGap(worldX);
@@ -2169,9 +2203,8 @@
     cushionEl.textContent = phase === "running" ? Math.round(marginCushionRemainingTicks()) : "—";
     // M6: SCORE now shows hwmTicks live (the same value that gets submitted to the
     // leaderboard at game-over) instead of the retired round-banked `score` var.
-    // ROUND is gone from the toolbar — `round` is frozen at 1 as of this milestone
-    // (see its declaration comment) and displaying a number that never changes was
-    // more confusing than informative.
+    // ROUND is gone from the toolbar — M7 removed the `round` var entirely, since
+    // rounds no longer exist as a concept and a frozen counter was never useful.
     document.getElementById("scoreVal").textContent = hwmTicks;
 
     // M5.5: always-visible core-loop statement (see .loopCue in <style> for why
