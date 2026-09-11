@@ -1,346 +1,201 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found]){display:none!important}</style></head><body>
-<title>Tape &amp; Ladder</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Tape &amp; Ladder — Matchstick Labs</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --void:#0a0f0c;
-    --panel:#0d1611;
-    --rule:#1c2e22;
-    --phosphor:#6ef2a0;
-    --phosphor-dim:#2c5b3f;
-    --down:#ff6b5c;
-    --down-dim:#5c3129;
-    --paper:#d8f5e2;
-    --muted:#7fa38c;
+  :root{color-scheme:dark;--void:#0b1220;--panel:#101c2d;--rule:#26374c;--phosphor:#43d9ad;--phosphor-dim:#286857;--down:#fa7785;--paper:#e6edf7;--muted:#9aaec6;--amber:#f2bb66;--mono:"IBM Plex Mono",ui-monospace,monospace}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--void);color:var(--paper);font:15px/1.5 "IBM Plex Sans",sans-serif;padding:16px 28px}
+  button,input{font:inherit}
+  button{border:1px solid var(--rule);border-radius:5px;padding:9px 14px;background:#19293e;color:var(--paper);cursor:pointer;min-height:42px;font-weight:500}
+  button:hover{background:#263b54;border-color:#6584a5}
+  button:disabled{opacity:.55;cursor:default}
+  button:focus-visible,a:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+  canvas:focus-visible{outline:1px solid #6584a5;outline-offset:-1px}
+  button.primary{background:var(--phosphor);color:#08241c;border-color:var(--phosphor);font-weight:600}
+  button.primary:hover{background:#78e9c7}
+  .ghost{background:transparent;color:var(--muted)}
+  kbd{font:11px var(--mono);padding:2px 5px;border:1px solid #425771;border-bottom-width:2px;border-radius:3px;color:var(--paper);white-space:nowrap}
+  .wrap{max-width:min(1200px,calc((100dvh - 370px)*1.69 + 280px));margin:auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:12px}
+  .identity{display:flex;align-items:center;gap:14px}
+  .mark{width:40px;height:40px;color:var(--phosphor);flex:none}
+  h1{font-size:28px;line-height:1.1;letter-spacing:-1px;margin:0;font-weight:600}
+  .thesis{font-size:13px;color:var(--muted);margin:6px 0 0}
+  .headerActions{display:flex;gap:8px;align-items:center;flex-shrink:0}.headerActions button{white-space:nowrap}
+  .toolbar{display:grid;grid-template-columns:1fr 1fr 1fr 1.5fr;background:var(--panel);border:1px solid var(--rule);border-radius:7px 7px 0 0}
+  .stat{padding:8px 18px;border-right:1px solid var(--rule);min-width:0}
+  .stat:last-child{border:0}
+  .tag{font-size:12px;color:var(--muted);display:block}
+  .stat b{font:500 22px/1.5 var(--mono);font-variant-numeric:tabular-nums}
+  .stat small{color:var(--muted);font-size:11px;margin-left:6px}
+  .up{color:var(--phosphor)}.down{color:var(--down)}
+  .marginHeading{display:flex;align-items:baseline;justify-content:space-between}
+  .marginHeading b{font-size:18px}
+  meter{display:block;width:100%;height:7px;margin:8px 0;appearance:none;background:var(--rule);border-radius:4px;overflow:hidden}
+  meter::-webkit-meter-bar{background:var(--rule);border:0}
+  meter::-webkit-meter-optimum-value{background:var(--phosphor)}
+  meter::-webkit-meter-suboptimum-value{background:var(--amber)}
+  meter::-webkit-meter-even-less-good-value{background:var(--down)}
+  meter::-moz-meter-bar{background:var(--phosphor)}
+  #marginHint{display:block;font-size:11px;color:var(--muted);line-height:1.4}
+  .panels{display:grid;grid-template-columns:minmax(0,1fr) 280px;border:1px solid var(--rule);border-top:0;border-radius:0 0 7px 7px;overflow:hidden}
+  .panel{min-width:0;background:var(--panel)}
+  .ladderPanel{border-left:1px solid var(--rule)}
+  .panelHeading{height:36px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:10px;border-bottom:1px solid var(--rule)}
+  h2{font-size:14px;margin:0;font-weight:500}
+  .panelHeading span{font:11px var(--mono);color:var(--muted)}
+  .panelHeading #sessionStatus{color:var(--phosphor)}
+  .canvas-shell{position:relative;min-width:0}
+  canvas{display:block;width:100%;height:auto}
+  #terrainCanvas{touch-action:manipulation}
+  .setupCard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(11,18,32,.92);padding:20px;gap:12px}
+  .setupCard h2{font-size:clamp(21px,3vw,32px);letter-spacing:-.7px;font-weight:500}
+  .setupCard p{max-width:43ch;margin:0;color:var(--muted);font-size:14px}
+  .setupCard .setupPosition{font:500 16px var(--mono);color:var(--paper);padding:9px 18px;border:1px solid var(--rule);border-radius:4px}
+  .setupActions{display:flex;gap:8px}
+  #startBtn{min-width:190px}
+  .setupCard .startHint{font-size:12px}
+  .lessonPreview{display:flex;align-items:center;gap:16px;margin-bottom:4px}
+  .lessonPreview svg{width:118px;height:48px}
+  .loopCue{margin:0;padding:8px 18px;color:var(--muted);font-size:12px;line-height:1.5;min-height:35px;border-bottom:1px solid var(--rule)}
+  .loopCue strong{color:var(--paper);font-weight:500}
+  .legendMark{color:var(--amber);font-family:var(--mono)}
+  .actionStrip{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 18px;min-height:46px;border-top:1px solid var(--rule)}
+  #nextCue{font-size:13px;color:var(--paper)}
+  #lastFill{font:11px var(--mono);text-align:right;color:var(--muted)}
+  .ladderHead{display:grid;grid-template-columns:1fr 1fr 1fr;padding:10px 14px 0;font:11px var(--mono);text-align:center;color:var(--muted)}
+  .ladderHead span:first-child{color:var(--phosphor)}.ladderHead span:last-child{color:var(--down)}
+  .ladderControls{display:flex;gap:8px;padding:12px 14px 6px}
+  .ladderControls button{flex:1;font-size:12px;padding:8px}
+  .hud{padding:10px 14px;color:var(--muted);font:12px/1.6 var(--mono)}
+  .ladderNote{font-size:12px;color:var(--muted);padding:0 14px;margin:4px 0 14px}
+  .bottomBar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:10px}
+  #regen{min-height:36px;padding:6px 12px}
+  .controlsLegend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted)}
+  footer{font-size:11px;color:var(--muted);margin-top:14px;display:flex;justify-content:space-between;gap:16px}
+  .overlay{position:fixed;inset:0;background:rgba(4,10,20,.84);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlayCard{background:var(--panel);border:1px solid #425771;border-radius:10px;max-width:520px;width:100%;max-height:calc(100dvh - 40px);overflow-y:auto;padding:28px;box-shadow:0 24px 80px #0007}
+  .overlayCard h2{font-size:26px;letter-spacing:-.6px;margin:0 0 16px}
+  .overlayCard p{color:var(--muted);font-size:14px;margin:0 0 15px}
+  .overlayCard b{color:var(--paper)}
+  .kbrow{display:flex;align-items:baseline;gap:12px;margin:12px 0;font-size:13px}
+  .lesson{padding:14px;background:#182a40;border-radius:5px;font-size:13px;color:var(--muted);margin:18px 0}
+  .close{display:block;margin:18px 0 0 auto}
+  .goScoreLine{font:500 44px var(--mono);color:var(--phosphor)}
+  .goForm{display:flex;align-items:center;gap:10px;margin:20px 0 12px;font-size:12px}
+  .goForm input{width:5em;background:var(--void);border:1px solid var(--rule);color:var(--paper);padding:8px;text-transform:uppercase;font-family:var(--mono)}
+  .goActions{display:flex;gap:8px}
+  .lbHead{display:flex;justify-content:space-between;border-top:1px solid var(--rule);padding-top:16px;margin-top:20px}
+  .lbHead h3{font-size:13px;margin:0}
+  #lbSource{font-size:11px;color:var(--muted)}
+  #lbList{list-style:none;padding:0;font:12px var(--mono)}
+  #lbList li{display:flex;gap:12px;padding:6px 0}
+  .lbRank{color:var(--muted);width:1.6em}
+  .lbInit{flex:1;color:var(--phosphor)}
+  .lbScore{color:var(--paper);font-weight:600;text-align:right}
+  .lbEmpty{color:var(--muted);padding:6px 0}
+  .touchControls{display:none}
+  @media(max-width:1000px){body{padding:20px}.panels{grid-template-columns:minmax(0,1fr) 230px}.stat{padding:13px 15px}.stat b{font-size:22px}.headerActions button{font-size:12px;padding:8px 10px}}
+  @media(max-width:760px){
+    body{padding:14px 12px}.wrap{max-width:580px}header{align-items:flex-start;margin-bottom:16px;gap:12px}h1{font-size:23px}.mark{width:28px;height:34px}.identity{gap:8px}.thesis{font-size:11px;max-width:26ch}
+    .headerActions{gap:5px}.headerActions button{font-size:11px;padding:6px 9px;min-height:36px}.headerActions kbd{display:none}#soundToggle{position:absolute;right:12px;top:57px;font-size:10px;min-height:24px;padding:2px 8px}
+    .toolbar{grid-template-columns:1fr 1fr}.stat{padding:9px 12px}.stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--rule)}.stat b{font-size:22px}.stat small{font-size:10px}.tag{font-size:11px}.marginHeading b{font-size:15px}#marginHint{font-size:10px}
+    .panels{grid-template-columns:1fr}.panelHeading{height:40px;padding:0 12px}.panelHeading span{font-size:10px}.loopCue{padding:8px 12px;font-size:11px;min-height:48px}
+    .ladderPanel{border-left:0;border-top:1px solid var(--rule);display:grid;grid-template-columns:1fr 1fr;align-items:start}.ladderPanel .panelHeading{grid-column:1/-1}.ladderBook{grid-row:2/6}.ladderHead{padding-top:12px;font-size:9px}.ladderControls{padding:12px 10px 0;gap:5px}.ladderControls button{font-size:11px;min-height:42px;padding:6px}.hud{font-size:11px;padding:10px}.ladderNote{font-size:11px;padding:0 10px}
+    .actionStrip{padding:9px 12px;min-height:61px;align-items:flex-start;flex-direction:column;gap:4px}#nextCue{font-size:12px}#lastFill{font-size:10px;text-align:left}
+    .setupCard{gap:8px;padding:14px}.setupCard h2{font-size:22px}.setupCard p{font-size:12px;max-width:36ch}.setupCard .setupPosition{font-size:12px;padding:5px 10px}.setupCard .startHint{font-size:10px}.lessonPreview{display:none}
+    .canvas-shell:has(#setupCard:not([hidden])){min-height:250px}
+    .bottomBar{align-items:flex-start}.controlsLegend{gap:9px;font-size:11px}#regen{font-size:11px;white-space:nowrap}.overlayCard{padding:22px}.overlayCard h2{font-size:23px}.overlayCard p{font-size:13px}footer{font-size:10px;margin-top:18px}
+    body.touchMode{padding-bottom:86px}.touchControls.active{display:flex;position:fixed;bottom:0;left:0;right:0;gap:8px;background:#0b1220f5;border-top:1px solid var(--rule);padding:10px 12px calc(10px + env(safe-area-inset-bottom));z-index:40}.touchBtn{flex:1;min-height:48px;font-size:12px;touch-action:none;user-select:none}.touchBtn[data-action="jump"]{flex:2;background:var(--phosphor);color:#08241c}
   }
-  *{box-sizing:border-box;}
-  body{
-    background:var(--void);
-    color:var(--paper);
-    font-family:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
-    min-height:100vh;
-    padding:28px 20px 40px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:22px;
-  }
-  .wrap{width:100%;max-width:1040px;display:flex;flex-direction:column;gap:18px;}
-
-  header{display:flex;flex-direction:column;gap:6px;}
-  h1{
-    font-family:"VT323",monospace;
-    font-size:clamp(2.4rem,6vw,3.4rem);
-    letter-spacing:.02em;
-    color:var(--phosphor);
-    text-shadow:0 0 18px rgba(110,242,160,.35);
-    margin:0;
-    line-height:1;
-    text-wrap:balance;
-  }
-  .thesis{
-    color:var(--muted);
-    font-size:.9rem;
-    max-width:62ch;
-    line-height:1.5;
-  }
-  .thesis kbd{
-    display:inline-block;
-    padding:1px 6px;
-    border:1px solid var(--phosphor-dim);
-    border-radius:2px;
-    color:var(--phosphor);
-    font-size:.78rem;
-    background:rgba(110,242,160,.06);
-  }
-
-  .toolbar{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    gap:14px;
-    padding:10px 14px;
-    background:var(--panel);
-    border:1px solid var(--rule);
-  }
-  .stats{
-    display:flex;
-    gap:16px;
-    font-size:.85rem;
-    letter-spacing:.03em;
-  }
-  .stats .tag{color:var(--muted);font-size:.7rem;letter-spacing:.08em;margin-right:4px;}
-  .stats b{color:var(--phosphor);font-weight:600;}
-  button{
-    margin-left:auto;
-    font-family:inherit;
-    font-size:.8rem;
-    letter-spacing:.06em;
-    text-transform:uppercase;
-    color:var(--void);
-    background:var(--phosphor);
-    border:none;
-    padding:8px 14px;
-    cursor:pointer;
-  }
-  button:hover{background:var(--paper);}
-  button:focus-visible, a:focus-visible{outline:2px solid var(--phosphor);outline-offset:2px;}
-  button.ghost{
-    margin-left:8px;
-    background:transparent;
-    color:var(--phosphor);
-    border:1px solid var(--phosphor-dim);
-    min-width:8.5em;
-  }
-  button.ghost:hover{background:rgba(110,242,160,.08);color:var(--paper);}
-  button.ghost[aria-pressed="false"]{color:var(--muted);border-color:var(--rule);}
-
-  .panels{
-    display:grid;
-    grid-template-columns:1.7fr 1fr;
-    gap:16px;
-  }
-  @media (max-width:760px){ .panels{grid-template-columns:1fr;} }
-
-  .panel{
-    background:var(--panel);
-    border:1px solid var(--rule);
-    display:flex;
-    flex-direction:column;
-    min-width:0;
-  }
-  .panel h2{
-    font-family:"VT323",monospace;
-    font-size:1.3rem;
-    letter-spacing:.06em;
-    color:var(--muted);
-    margin:0;
-    padding:10px 14px 8px;
-    border-bottom:1px solid var(--rule);
-  }
-  .panel h2 span{color:var(--phosphor);}
-  .canvas-shell{
-    position:relative;
-    min-width:0;
-    background:
-      repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0px, rgba(255,255,255,.025) 1px, transparent 1px, transparent 3px);
-  }
-  canvas{display:block;width:100%;height:auto;}
-  .hud{
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:space-between;
-    gap:10px;
-    padding:9px 14px;
-    border-top:1px solid var(--rule);
-    font-size:.82rem;
-    font-variant-numeric:tabular-nums;
-    color:var(--paper);
-  }
-  .hud .tag{color:var(--muted);letter-spacing:.08em;font-size:.7rem;}
-  .hud .up{color:var(--phosphor);}
-  .hud .down{color:var(--down);}
-
-  /* M5.5: always-visible core-loop statement — deliberately NOT gated behind the
-     H help overlay, per playtester feedback that the loop wasn't legible without
-     digging for it. Lives above the canvas, visible from frame one (including
-     during setup, since direction is already assigned by then). */
-  .loopCue{
-    padding:8px 14px 0;
-    font-size:.78rem;
-    letter-spacing:.02em;
-    color:var(--muted);
-  }
-  .loopCue .up{color:var(--phosphor);}
-  .loopCue .down{color:var(--down);}
-
-  footer{
-    max-width:1040px;
-    width:100%;
-    color:var(--muted);
-    font-size:.78rem;
-    line-height:1.6;
-    border-top:1px solid var(--rule);
-    padding-top:14px;
-  }
-  footer code{color:var(--phosphor);}
-
-  @media (prefers-reduced-motion:no-preference){
-    .panel{animation:flicker 6s infinite;}
-  }
-  @keyframes flicker{
-    0%,96%,100%{filter:brightness(1);}
-    97%{filter:brightness(1.04);}
-    98%{filter:brightness(.98);}
-  }
-
-  .overlay{
-    position:fixed; inset:0;
-    background:rgba(10,15,12,.86);
-    display:flex; align-items:center; justify-content:center;
-    z-index:50; padding:20px;
-  }
-  .overlayCard{
-    background:var(--panel);
-    border:1px solid var(--phosphor-dim);
-    max-width:480px; width:100%;
-    padding:22px 24px;
-    box-shadow:0 0 40px rgba(110,242,160,.12);
-  }
-  .overlayCard h2{
-    font-family:"VT323",monospace;
-    font-size:1.6rem;
-    letter-spacing:.04em;
-    color:var(--phosphor);
-    margin:0 0 12px;
-  }
-  .overlayCard p{color:var(--muted);font-size:.85rem;line-height:1.6;margin:0 0 10px;}
-  .overlayCard .close{
-    display:block; margin:16px 0 0 auto; background:transparent; color:var(--muted);
-    border:1px solid var(--rule); text-transform:none; letter-spacing:0; font-size:.78rem;
-  }
-  .overlayCard .close:hover{color:var(--paper);border-color:var(--phosphor-dim);}
-  .kbrow{display:flex; gap:10px; align-items:baseline; margin:6px 0; font-size:.85rem;}
-  .kbrow kbd{
-    display:inline-block; min-width:1.6em; text-align:center;
-    padding:2px 6px; border:1px solid var(--phosphor-dim); border-radius:2px;
-    color:var(--phosphor); font-size:.78rem; background:rgba(110,242,160,.06);
-  }
-  .lesson{
-    margin-top:14px; padding:10px 12px;
-    border-left:2px solid var(--phosphor-dim);
-    color:var(--paper); font-size:.82rem; line-height:1.55;
-  }
-
-  .goScoreLine{font-family:"VT323",monospace; font-size:2.6rem; color:var(--phosphor); line-height:1; margin:2px 0 4px;}
-  .goMessage{color:var(--paper); font-size:.88rem; font-style:italic; margin:0 0 16px;}
-  .goForm{display:flex; gap:8px; align-items:center; margin-bottom:14px;}
-  .goForm label{color:var(--muted); font-size:.78rem; letter-spacing:.06em;}
-  .goForm input{
-    font-family:inherit; font-size:1.1rem; letter-spacing:.2em; text-transform:uppercase;
-    width:5em; padding:6px 8px; background:var(--void); color:var(--paper);
-    border:1px solid var(--phosphor-dim); text-align:center;
-  }
-  .goForm input:focus-visible{outline:2px solid var(--phosphor); outline-offset:1px;}
-  .goActions{display:flex; gap:8px; flex-wrap:wrap;}
-  .lbHead{display:flex; justify-content:space-between; align-items:baseline; margin-top:16px; border-top:1px solid var(--rule); padding-top:12px;}
-  .lbHead h3{font-family:"VT323",monospace; font-size:1.15rem; color:var(--muted); margin:0; letter-spacing:.05em;}
-  #lbSource{font-size:.68rem; color:var(--muted); letter-spacing:.08em;}
-  #lbList{list-style:none; margin:8px 0 0; padding:0; font-size:.85rem;}
-  #lbList li{display:flex; gap:10px; padding:3px 0; border-bottom:1px dotted var(--rule);}
-  #lbList .lbRank{color:var(--muted); width:1.6em;}
-  #lbList .lbInit{color:var(--phosphor); flex:1; letter-spacing:.1em;}
-  #lbList .lbScore{color:var(--paper); font-variant-numeric:tabular-nums;}
-  #lbList .lbEmpty{color:var(--muted); border:none;}
-
-  body.touchMode{padding-bottom:112px;}
-  .touchControls{
-    display:none;
-    position:fixed; left:0; right:0; bottom:0;
-    background:rgba(10,15,12,.94);
-    border-top:1px solid var(--rule);
-    padding:10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
-    gap:8px;
-    z-index:40;
-    justify-content:center;
-    flex-wrap:wrap;
-  }
-  .touchControls.active{display:flex;}
-  .touchBtn{
-    font-family:inherit; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase;
-    color:var(--phosphor); background:rgba(110,242,160,.08);
-    border:1px solid var(--phosphor-dim);
-    padding:13px 15px; min-width:3.4em; text-align:center; border-radius:2px;
-    -webkit-user-select:none; user-select:none; touch-action:manipulation;
-  }
-  .touchBtn:active{background:rgba(110,242,160,.24);}
+  @media(pointer:coarse) and (min-width:761px){.touchControls.active{display:flex;gap:10px;max-width:1360px;margin:16px auto}.touchBtn{min-width:100px;touch-action:none}}
+  @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <header>
-    <h1>TAPE &amp; LADDER</h1>
-    <p class="thesis">Set your starting leverage on the ladder, then survive the tape. <kbd>H</kbd> for how to play.</p>
+    <div class="identity">
+      <svg class="mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 5v30m12-34v34m12-24v28" stroke="currentColor" stroke-width="2"/><path d="M4 13h8v13H4zm12-5h8v15h-8z" fill="currentColor"/><path d="M28 22h8v10h-8z" fill="#fa7785"/></svg>
+      <div><h1>Tape &amp; Ladder</h1><p class="thesis">Read the market. Jump the risk. Keep your edge.</p></div>
+    </div>
+    <div class="headerActions">
+      <button id="pauseBtn" class="ghost" type="button" disabled>Pause <kbd>P</kbd></button>
+      <button id="helpBtn" class="ghost" type="button" aria-expanded="false" aria-controls="helpOverlay">How to play</button>
+      <button id="soundToggle" class="ghost" type="button" aria-pressed="true">Sound on</button>
+    </div>
   </header>
-
-  <div class="toolbar">
-    <div class="stats">
-      <span><span class="tag">SCORE</span><b id="scoreVal">0</b></span>
-    </div>
-    <button id="helpBtn" class="ghost" type="button" aria-pressed="false">Help &middot; H</button>
-    <button id="soundToggle" class="ghost" type="button" aria-pressed="true">Sound &middot; ON</button>
-    <button id="regen" type="button">New run &middot; R</button>
+  <div class="toolbar" aria-label="Run statistics">
+    <div class="stat"><span class="tag">Peak P&amp;L · your score</span><b id="scoreVal" class="up">0</b><small>ticks</small></div>
+    <div class="stat"><span class="tag">Live P&amp;L</span><b id="hudPnl">+0</b><small>ticks</small></div>
+    <div class="stat"><span class="tag">Your position</span><b id="hudPosition" class="up">LONG</b><small id="hudLeverage">1×</small></div>
+    <div class="stat"><div class="marginHeading"><span class="tag">Margin remaining</span><b id="hudCushion">18.0</b></div><meter id="marginMeter" min="0" max="1" low=".25" high=".55" optimum="1" value="1" aria-label="Margin cushion remaining"></meter><span id="marginHint">Start at 1× for room to learn.</span></div>
   </div>
-
   <div class="panels">
-    <section class="panel">
-      <h2>TERRAIN &mdash; <span>the tape you run</span></h2>
+    <section class="panel tapePanel" aria-label="Playable chart">
+      <div class="panelHeading"><h2>Price action</h2><span id="sessionStatus">Ready to open</span><span>Synthetic / T&amp;L</span></div>
       <p class="loopCue" id="loopCue"></p>
-      <div class="canvas-shell"><canvas id="terrainCanvas" width="680" height="402" aria-label="Candle terrain runner"></canvas></div>
-      <div class="hud">
-        <span><span class="tag">POSITION</span> <span id="hudPosition">&mdash;</span></span>
-        <span><span class="tag">LEVERAGE</span> <span id="hudLeverage">&mdash;</span></span>
-        <span><span class="tag">PNL</span> <span id="hudPnl">0</span></span>
-        <span><span class="tag">EQUITY</span> <span id="hudEquity">&mdash;</span></span>
-        <span><span class="tag">CUSHION</span> <span id="hudCushion">&mdash;</span></span>
+      <div class="canvas-shell">
+        <canvas id="terrainCanvas" width="680" height="402" tabindex="0" aria-label="Auto-running candle course. Space or up arrow jumps; hold for a higher jump. W and S adjust the risk ladder."></canvas>
+        <div class="setupCard" id="setupCard">
+          <div class="lessonPreview" aria-hidden="true"><svg viewBox="0 0 118 48"><path d="M0 43h118" stroke="#425771"/><path d="M8 36Q47-19 85 36" stroke="#f2bb66" stroke-dasharray="3 4"/><path d="M61 9v33" stroke="#fa7785"/><path d="M55 20h12v17H55z" fill="#fa7785"/><path d="M51 17v26h20V17" stroke="#f2bb66" fill="none"/><rect x="5" y="29" width="9" height="14" fill="#e6edf7"/></svg></div>
+          <h2>Trade your way through the tape.</h2>
+          <p>Jump marked candles. Hold to clear a cluster.<br>The tape runs automatically.</p>
+          <div class="setupPosition" id="setupPosition">LONG · 1× leverage</div>
+          <div class="setupActions"><button id="startBtn" class="primary" type="button">Start run <kbd>Space</kbd></button></div>
+          <p class="startHint">Start at 1×. Use W / S or the ladder buttons to change risk.<br>The course reveals when you start.</p>
+        </div>
+        <div class="setupCard" id="pauseCard" hidden><h2>Take a breath.</h2><p>Your run is paused.</p><button id="resumeBtn" class="primary" type="button">Resume run</button></div>
       </div>
+      <div class="actionStrip"><span id="nextCue">Your first move: start the tape.</span><span id="lastFill">Fills appear here as you run.</span></div>
     </section>
-
-    <section class="panel">
-      <h2>THE LADDER &mdash; <span>set your risk</span></h2>
-      <div class="canvas-shell"><canvas id="ladderCanvas" width="360" height="360" aria-label="Order book climbing wall"></canvas></div>
-      <div class="hud">
-        <span id="lLevel">&mdash;</span>
-      </div>
+    <section class="panel ladderPanel" aria-label="Risk ladder">
+      <div class="panelHeading"><h2>Depth &amp; leverage</h2><span>1×–8×</span></div>
+      <div class="ladderBook"><div class="ladderHead"><span>Bid size</span><span>Price</span><span>Ask size</span></div><canvas id="ladderCanvas" width="360" height="360" aria-label="Synthetic bid and ask depth. The highlighted rung sets direction and leverage."></canvas></div>
+      <div class="ladderControls"><button id="ladderUp" type="button" aria-label="Move up the risk ladder">↑ <kbd>W</kbd></button><button id="ladderDown" type="button" aria-label="Move down the risk ladder">↓ <kbd>S</kbd></button></div>
+      <div class="hud"><span id="lLevel"></span></div>
+      <p class="ladderNote">Above entry: long. Below: short.<br>Further from entry: more leverage.<br>Higher leverage leaves less room for losses.</p>
     </section>
   </div>
-
-  <footer>
-    Synthetic data, regenerates every run &mdash; not wired to any real session or trading system.
-  </footer>
+  <div class="bottomBar"><div class="controlsLegend"><span><kbd>Space</kbd> / <kbd>↑</kbd> jump · hold for height</span><span><kbd>W</kbd> <kbd>S</kbd> move ladder</span><span><kbd>P</kbd> pause</span></div><button id="regen" class="ghost" type="button">New run <kbd>R</kbd></button></div>
+  <footer><span>Matchstick Labs · An arcade experiment</span><span>Synthetic prices. No real trades.</span></footer>
 </div>
-
-<div id="helpOverlay" class="overlay" hidden>
+<div id="helpOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
   <div class="overlayCard">
-    <h2>HOW TO PLAY</h2>
-    <p>Each run you're randomly assigned <b style="color:var(--phosphor)">LONG</b> or <b style="color:var(--down)">SHORT</b>. Climb the ladder to set your <b>STARTING LEVERAGE</b> (1x-8x) before the tape reveals. Once locked, the tape starts scrolling: run across candles in your favor, jump the ones stacked against you, and keep adjusting leverage live on the ladder as you go &mdash; crossing entry flips LONG/SHORT. Clear an obstacle for profit, miss it and it costs you. Higher leverage swings your PnL harder both ways and shrinks your margin cushion &mdash; drawdown past that cushion is a <b>MARGIN CALL</b>, and the run is over. The tape gets faster and throws new hazard types at you the further you run.</p>
-    <div class="kbrow"><kbd>&larr;</kbd><kbd>&rarr;</kbd> <span>run</span></div>
-    <div class="kbrow"><kbd>&uarr;</kbd> <span>jump</span></div>
-    <div class="kbrow"><kbd>W</kbd><kbd>S</kbd> <span>move ladder cursor &mdash; sets starting leverage before the run, then live leverage (1x-8x) once running; crossing entry flips LONG/SHORT</span></div>
-    <div class="kbrow"><kbd>SPACE</kbd> <span>confirm starting leverage</span></div>
-    <div class="kbrow"><kbd>R</kbd> <span>start a new run (resets score)</span></div>
-    <p style="margin-top:10px;">On a touch device, the same actions are mirrored by the on-screen buttons at the bottom of the screen.</p>
-    <div class="lesson">Your starting leverage sets your margin cushion before you've seen a single candle. The tape doesn't know, and doesn't care, which side you took.</div>
-    <button class="close" id="helpClose" type="button">Close</button>
+    <h2 id="helpTitle">Read the tape. Stay in the game.</h2>
+    <p>The tape runs automatically. Your job is to <b>jump the marked obstacles</b> and protect your margin. Start at <b>1× leverage</b> while you learn the rhythm.</p>
+    <div class="kbrow"><kbd>Space / ↑</kbd><span>Tap to jump. Hold for a higher, longer arc.</span></div>
+    <div class="kbrow"><kbd>W / S</kbd><span>Move up / down the risk ladder. Crossing entry flips your side.</span></div>
+    <div class="kbrow"><kbd>P / Esc</kbd><span>Pause or resume the run.</span></div>
+    <div class="kbrow"><kbd>R</kbd><span>Start a fresh course.</span></div>
+    <div class="lesson"><b>Read the marks, not just the colors.</b><br>Green candles close higher; red candles close lower. Amber brackets mark a jump obstacle. Wicks are decoration. Small candles can still change P&amp;L when you pass them, even in the air.</div>
+    <p><b>Watch what comes next.</b> Hold through a volume cluster or a news gap. Stay low under resistance; jump hostile support. Later, fans and moving-average channels add new timing challenges. The cue below the chart calls them out.</p>
+    <p><b>Your score is your highest P&amp;L.</b> Every gain and loss is multiplied by leverage. A loss from your peak uses up margin; exceed the allowance and the run ends. This is an arcade scoring rule.</p>
+    <button class="close primary" id="helpClose" type="button">Got it</button>
   </div>
 </div>
-
-<div id="gameOverOverlay" class="overlay" hidden>
+<div id="gameOverOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle" hidden>
   <div class="overlayCard">
-    <h2>RUN OVER</h2>
-    <div class="goScoreLine" id="goScore">0</div>
-    <p class="goMessage" id="goMessage"></p>
-    <div class="goForm">
-      <label for="initialsInput">INITIALS</label>
-      <input id="initialsInput" maxlength="3" autocomplete="off" spellcheck="false" value="">
-    </div>
-    <div class="goActions">
-      <button id="goSubmit" type="button">Submit score</button>
-      <button id="goPlayAgain" class="ghost" type="button">Play again</button>
-    </div>
-    <div class="lbHead"><h3>LEADERBOARD</h3><span id="lbSource"></span></div>
-    <ul id="lbList"></ul>
+    <h2 id="gameOverTitle">Margin called.</h2>
+    <span class="tag">Peak P&amp;L · final score</span><div class="goScoreLine" id="goScore">0</div>
+    <p id="goMessage"></p>
+    <button id="goPlayAgain" class="primary" type="button">Try another run</button>
+    <div class="goForm"><label for="initialsInput">Leaderboard initials</label><input id="initialsInput" maxlength="3" autocomplete="off" spellcheck="false" value=""></div>
+    <div class="goActions"><button id="goSubmit" class="ghost" type="button">Submit score</button></div>
+    <div class="lbHead"><h3>Leaderboard</h3><span id="lbSource"></span></div><ul id="lbList"></ul>
   </div>
 </div>
-
-<div id="touchControls" class="touchControls" aria-hidden="true">
-  <button type="button" class="touchBtn" data-action="left" aria-label="Run left">&larr;</button>
-  <button type="button" class="touchBtn" data-action="right" aria-label="Run right">&rarr;</button>
-  <button type="button" class="touchBtn" data-action="jump" aria-label="Jump">JUMP</button>
-  <button type="button" class="touchBtn" data-action="climbUp" aria-label="Climb ladder up">&uarr; LADDER</button>
-  <button type="button" class="touchBtn" data-action="climbDown" aria-label="Climb ladder down">&darr; LADDER</button>
-  <button type="button" class="touchBtn" data-action="confirm" aria-label="Confirm placement">SET</button>
-  <button type="button" class="touchBtn" data-action="restart" aria-label="New run">RESTART</button>
+<div id="touchControls" class="touchControls" aria-label="Game controls" aria-hidden="true">
+  <button type="button" class="touchBtn" data-action="climbDown" aria-label="Move down the risk ladder">↓ Risk</button>
+  <button type="button" class="touchBtn" data-action="jump" aria-label="Jump; hold for height">Jump / hold</button>
+  <button type="button" class="touchBtn" data-action="climbUp" aria-label="Move up the risk ladder">↑ Risk</button>
 </div>
 
 <script>window.LEADERBOARD_API_URL = "https://matchstick-labs-leaderboard-api.matchstick.workers.dev";</script>
@@ -536,7 +391,7 @@
   var soundBtn = document.getElementById("soundToggle");
   function refreshSoundBtn(){
     var on = SoundFX.isEnabled();
-    soundBtn.textContent = "Sound · " + (on ? "ON" : "OFF");
+    soundBtn.textContent = "Sound " + (on ? "on" : "off");
     soundBtn.setAttribute("aria-pressed", on ? "true" : "false");
   }
   refreshSoundBtn();
@@ -550,8 +405,8 @@
   // -2*JUMP_V/GRAVITY = 0.773s (see tapJumpAirtimeS()), so the ground it covers is
   // 0.773 * scrollSpeed: 101px at SCROLL_SPEED_START, 193px at SCROLL_SPEED_MAX.
   // That matters because updateTerrain() only converts `jumpQueued` into an impulse
-  // when `player.onGround` — a jump pressed mid-air is silently *dropped*, not
-  // buffered. So whenever two obstacles are closer than one airtime, a player who
+  // when `player.onGround`. M10 discarded mid-air input; the UI pass now buffers
+  // the final 110ms before landing. For wider separations within one airtime, a player who
   // jumps once per obstacle loses the second input: they press jump, nothing
   // happens, they take -3. The skilled answer is to clear the pair with a single
   // arc, which is always available (at 144px apart and top speed the arc is still
@@ -567,13 +422,6 @@
   // against the harness: it removed the test at every speed and, with the rest of
   // this pass, made the run effectively survivable forever.)
   var MIN_OBSTACLE_GAP_COLS = 6;     // no two jump-obstacles closer than this, at any difficulty
-  var DEATH_MESSAGES = [
-    "Leverage didn't care how good the setup looked.",
-    "Risk was defined the moment you set it, not when it happened.",
-    "The tape never knew which side you took.",
-    "That's what the cushion is for."
-  ];
-
   // M4: live leverage/direction control while running. LADDER_MOVE_COOLDOWN_MS caps
   // how fast the cursor can climb (keyboard repeat is already blocked by e.repeat on
   // keydown, but this also covers rapid distinct presses and touch taps, and is the
@@ -610,7 +458,13 @@
   var hwmTicks = 0;
   var pnlTicks = 0;
   var banner = null;            // {text, color, until}
-  var helpOpen = false;
+  var helpOpen = false, paused = false, gameOverTimer = null;
+  var lastFeedback = "", helpReturnFocus = null;
+  var reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var reducedMotion = reducedMotionQuery.matches;
+  var onReducedMotionChange = function(e){ reducedMotion = e.matches; };
+  if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener("change", onReducedMotionChange);
+  else if (reducedMotionQuery.addListener) reducedMotionQuery.addListener(onReducedMotionChange);
   // M5.5: per-event PnL-cause callouts (see spawnFloatText()) — distinct from
   // `banner`, which is reserved for whole-round events (win/stop-out). These are
   // small and numerous by design: the point is to visibly tie each PnL change to
@@ -619,13 +473,24 @@
   var floatingTexts = [];
 
   function resetRun(){
-    // M5.5: a brand new run should feel like a first run again — restart the
-    // scroll-speed ramp from its slow start rather than carrying over whatever
-    // speed the previous run had reached.
+    clearTimeout(gameOverTimer); gameOverTimer = null;
+    if (helpOpen) setHelpOpen(false); // a stuck helpOpen from the prior run must never block Start
+    clearInput(); paused = false;
     rampDistancePx = 0; scrollSpeed = SCROLL_SPEED_START;
+    if (!/[?&]seed=\d+/.test(location.search)) runSeed = Date.now() >>> 0;
+    rand = mulberry32(runSeed);
+    basePrice = 100 + Math.floor(rand()*40);
+    bars = []; barsBaseIndex = 0; barsGenIndex = 0; barLevel = .5;
+    barsClassifiedUpTo = 0; lastObstacleAbsI = -999;
+    chartWindowStartI = null; chartWindowEndI = null; // invalidate drawTerrain()'s chartLow/High cache
+    hazards = []; nextHazardX = 2400;
+    hwmTicks = 0; equity = BASE_EQUITY; lastHitSource = null; lastFeedback = "";
+    initTerrainPlayer(); lastCam = 0; lastIdx = terrainIndexAt(player.x);
     document.getElementById("gameOverOverlay").hidden = true;
     document.getElementById("goSubmit").disabled = false;
+    document.getElementById("pauseCard").hidden = true;
     newRound();
+    document.getElementById("startBtn").focus({preventScroll:true});
   }
 
   // ---------------------------------------------------------------- TERRAIN
@@ -633,16 +498,17 @@
   var tSurf = setupCanvas(tCanvas);
 
   function setupCanvas(cv){
-    // Backing-store resolution only — display size stays governed by the
-    // stylesheet's width:100%/height:auto so the canvas actually shrinks on
-    // narrow viewports instead of forcing a fixed-pixel minimum layout width.
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var cssW = cv.width, cssH = cv.height;
-    cv.width = Math.round(cssW * dpr);
-    cv.height = Math.round(cssH * dpr);
-    var ctx = cv.getContext("2d");
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    return {ctx:ctx, w:cssW, h:cssH};
+    var surface={ctx:cv.getContext("2d"),w:cv.width,h:cv.height};
+    function resizeBacking(){
+      var scale=Math.max(1,cv.getBoundingClientRect().width/surface.w)*(window.devicePixelRatio||1);
+      scale=Math.min(scale,4);
+      var width=Math.round(surface.w*scale),height=Math.round(surface.h*scale);
+      if(cv.width!==width||cv.height!==height){cv.width=width;cv.height=height;}
+      surface.ctx.setTransform(width/surface.w,0,0,height/surface.h,0,0);
+    }
+    resizeBacking();
+    new ResizeObserver(resizeBacking).observe(cv.parentElement);
+    return surface;
   }
 
   var COLW = 24, MAXH = 230, BASE_MARGIN = 26;
@@ -930,7 +796,8 @@
   // candles only. The player's first job is reading a hostile candle as a hurdle;
   // that shouldn't have to be learned at the same time as the first hazard shape.
   var hazards = [], nextHazardX = 2400;
-  var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0;
+  var player, keysHeld = {}, jumpQueued = false, jumpHoldMs = 0, jumpBufferMs = 0;
+  var JUMP_BUFFER_MS = 110;
   var basePrice = 100 + Math.floor(rand()*40);
   var lastCam = 0, lastIdx = 0;
   // World-space scroll offset. Now advances on its own every frame (auto-scroll)
@@ -1559,9 +1426,14 @@
   // bar's magnitude), this preserves the bar's actual LEVEL, so the plotted line
   // genuinely tracks the random walk up and down over time instead of always sitting
   // on a zero baseline.
+  var chartLow = 0, chartHigh = 1;
+  // Rescan the visible bar window for chartLow/chartHigh only when that window
+  // actually shifts, not on every animation frame (see drawTerrain()).
+  var chartWindowStartI = null, chartWindowEndI = null;
   function mapPriceY(norm){
-    return PRICE_LANE_TOP_PX + PRICE_LANE_H - norm*PRICE_LANE_H;
+    return PRICE_LANE_TOP_PX + PRICE_LANE_H - (norm-chartLow)/(chartHigh-chartLow)*PRICE_LANE_H;
   }
+  function displayPrice(norm){ return (basePrice + (norm-.5)*1.28).toFixed(2); }
   // No more upper clamp — bar-index space is unbounded now ("no more end of the
   // world"). Still floored at 0: world-space never goes negative.
   function terrainIndexAt(worldX){ return Math.max(0, Math.floor(worldX/COLW)); }
@@ -1604,19 +1476,20 @@
   function updateTerrain(dt){
     var wasOnGround = player.onGround;
 
-    if (jumpQueued && player.onGround){
+    if (jumpQueued) jumpBufferMs = JUMP_BUFFER_MS;
+    jumpQueued = false;
+    if (jumpBufferMs > 0 && player.onGround){
       player.vy = JUMP_V;
       player.onGround = false;
-      jumpHoldMs = 0;
+      jumpHoldMs = 0; jumpBufferMs = 0;
       SoundFX.jump();
-    }
-    jumpQueued = false;
+    } else jumpBufferMs = Math.max(0, jumpBufferMs - dt*1000);
 
     // Hold-to-charge: while the jump button/key is held, the player is airborne and
     // still ascending, and we're inside the hold window, reduce gravity so the arc
     // keeps extending. Any other moment (grounded, released, falling, or past the
     // window) uses full gravity — identical to the old fixed-impulse jump.
-    var holdingJump = !!keysHeld["ArrowUp"];
+    var holdingJump = !!keysHeld["ArrowUp"] || !!keysHeld[" "];
     var extendingHold = holdingJump && !player.onGround && player.vy < 0 && jumpHoldMs < JUMP_HOLD_MAX_MS;
     if (extendingHold){
       player.vy += GRAVITY*JUMP_HOLD_GRAVITY_MULT*dt;
@@ -1669,9 +1542,8 @@
         // out" recovery: stumble, not stuck — no softlock, the run keeps moving,
         // and the rest of this same gap's span behaves like solid ground again.
         gapHere.fallResolved = true;
-        applyPnlDelta(-3, "gap");
         SoundFX.gapFall();
-        spawnFloatText("-3", "#ff6b5c", true);
+        applyPnlDelta(-3, "gap", "#ff6b5c", true);
         player.y = baseline - PLAYER_H;
         player.vy = 0;
         player.onGround = true;
@@ -1763,26 +1635,33 @@
   // (see checkMarginCall()) — every PnL change also updates hwmTicks, the running
   // high-water-mark that both the live CUSHION readout and the final score are
   // computed from.
-  function applyPnlDelta(delta, source){
-    pnlTicks += delta * leverage;
+  // `floatColor`/`floatBig` are optional: passing them spawns the on-screen
+  // callout for this change using the real leveraged `actual`, instead of each
+  // call site re-deriving that same multiplication independently (see
+  // spawnFloatText() below).
+  function applyPnlDelta(delta, source, floatColor, floatBig){
+    var actual = delta * leverage;
+    lastFeedback = (actual > 0 ? "+" : "") + actual + " ticks · " + (source === "candle" ? (delta === 2 ? "candle cleared" : delta === -3 ? "candle hit" : delta > 0 ? "favorable tape" : "adverse tape") : hazardName(source));
+    pnlTicks += actual;
     hwmTicks = Math.max(hwmTicks, pnlTicks);
     equity = BASE_EQUITY + pnlTicks;
     // Harness support: `source` is optional and only ever read for diagnostics
     // (see lastHitSource's declaration comment) — omitting it changes nothing.
     if (delta < 0 && source) lastHitSource = source;
+    if (floatColor) spawnFloatText((actual > 0 ? "+" : "") + actual, floatColor, floatBig);
     checkMarginCall();
   }
 
   // M5.5: spawns a small, short-lived label at the player's current screen
   // position — playtester feedback ("I'm being rewarded for jumping?") traced to
-  // there being no on-screen answer to "why did my PnL just move." resolveBar()
-  // only calls this at the exact moment a bar resolves (on contact for a hit, or
-  // right as the player clears it), so player.x/y is a good proxy for "the candle
-  // that just caused this." `big` marks the jump-dependent obstacle outcomes
-  // (+2/-3 — drawn larger, held longer) apart from the ambient drift that happens
-  // just from being in a favorable/adverse position without jumping at all (+1/-1
-  // — drawn smaller, briefer) — the callout's own size is the cue that distinguishes
-  // "this one needed a jump" from "this one didn't."
+  // there being no on-screen answer to "why did my PnL just move." Called from
+  // applyPnlDelta() at the exact moment a bar/hazard resolves (on contact for a
+  // hit, or right as the player clears it), so player.x/y is a good proxy for
+  // "the candle that just caused this." `big` marks the jump-dependent obstacle
+  // outcomes (+2/-3 — drawn larger, held longer) apart from the ambient drift
+  // that happens just from being in a favorable/adverse position without
+  // jumping at all (+1/-1 — drawn smaller, briefer) — the callout's own size is
+  // the cue that distinguishes "this one needed a jump" from "this one didn't."
   function spawnFloatText(text, color, big){
     floatingTexts.push({
       text: text, color: color, big: !!big,
@@ -1793,12 +1672,12 @@
 
   function resolveBar(b, kind){
     b.resolved = true;
-    var delta = 0;
-    if (kind === "hit"){ delta = -3; SoundFX.bump(); spawnFloatText("-3", "#ff6b5c", true); }
-    else if (kind === "clear"){ delta = 2; SoundFX.obstacleClear(); spawnFloatText("+2", "#6ef2a0", true); }
-    else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); spawnFloatText("+1", "#6ef2a0", false); }
-    else if (kind === "rough"){ delta = -1; SoundFX.pnlTick(-1); spawnFloatText("-1", "#ff6b5c", false); }
-    applyPnlDelta(delta, "candle");
+    var delta = 0, color = "#6ef2a0", big = false;
+    if (kind === "hit"){ delta = -3; color = "#ff6b5c"; big = true; SoundFX.bump(); }
+    else if (kind === "clear"){ delta = 2; big = true; SoundFX.obstacleClear(); }
+    else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
+    else if (kind === "rough"){ delta = -1; color = "#ff6b5c"; SoundFX.pnlTick(-1); }
+    applyPnlDelta(delta, "candle", color, big);
   }
 
   // ------------------------------------------------------------- HAZARDS (M5a)
@@ -1915,20 +1794,19 @@
   // for identity with candles here, not novelty.
   function resolveHazards(){
     for (var i=0;i<hazards.length;i++){
+      if (phase !== "running") break;
       var hz = hazards[i];
       var hit = testHazardCollision(hz, player);
       if (!hit) continue;
       if (hz.type === "tunnel"){
         hz.lastGrazeAt = performance.now();
-        applyPnlDelta(-TUNNEL_GRAZE_PENALTY, "tunnel");
         SoundFX.tunnelGraze();
-        spawnFloatText("-1", "#ffb454", false);
+        applyPnlDelta(-TUNNEL_GRAZE_PENALTY, "tunnel", "#ffb454", false);
       } else {
         hit.hitApplied = true;
-        applyPnlDelta(-3, hz.type);
         var hitSound = hz.type === "wall" ? "wallHit" : (hz.type === "volSpikes" ? "bump" : "hazardHit");
         SoundFX[hitSound]();
-        spawnFloatText("-3", "#ff6b5c", true);
+        applyPnlDelta(-3, hz.type, "#ff6b5c", true);
       }
     }
   }
@@ -1961,10 +1839,13 @@
     phase = "gameover";
     SoundFX.stoppedOut();
     banner = { text: "MARGIN CALL", color: "#ff6b5c", until: performance.now()+1000 };
-    var msg = DEATH_MESSAGES[Math.floor(Math.random()*DEATH_MESSAGES.length)];
+    var msg = hazardName(lastHitSource) + " ended the run at " + leverage + "×. Your drawdown reached " +
+      (hwmTicks - pnlTicks) + " ticks against a " + (BASE_CUSHION / leverage).toFixed(1) +
+      "-tick allowance. " + (leverage > 1 ? "Try 1× for more room to recover." :
+      HAZARD_RECOVERY_TIP[lastHitSource] || "Watch the marked obstacles and the next-action cue.");
     // M6: leaderboard submits hwmTicks, not the retired round-banked `score` var —
     // showGameOver() reads it straight off the live state, nothing to pass here.
-    setTimeout(function(){ showGameOver(msg); }, 1050);
+    gameOverTimer = setTimeout(function(){ if (phase === "gameover") showGameOver(msg); }, 650);
   }
 
   // Dispatch-by-type, mirroring testHazardCollision() — one place to add a new
@@ -1975,7 +1856,7 @@
       if (hz.type === "gannFan") drawGannFan(ctx, cam, w, hz);
       else if (hz.type === "wall") drawWall(ctx, cam, w, hz);
       else if (hz.type === "tunnel") drawTunnel(ctx, cam, w, hz);
-      else if (hz.type === "gap") drawGap(ctx, cam, w, hz);
+      // Gaps are painted before candles in drawTerrain().
       else if (hz.type === "volSpikes") drawVolSpikes(ctx, cam, w, hz);
     }
   }
@@ -2127,14 +2008,9 @@
 
     if (hz.xEnd < cam || hz.xStart > cam+w) return; // void itself fully off-screen
     var x0 = Math.max(hz.xStart, cam) - cam, x1 = Math.min(hz.xEnd, cam+w) - cam;
-    // The void overlay: baselineY()'s stripe (drawn once, full-width, earlier in
-    // drawTerrain()) and any ordinary candle that would otherwise land in this
-    // span get painted over here — the same painter's-algorithm layering every
-    // other drawHazards() call already relies on, rather than teaching
-    // bars[]/drawTerrain about gaps directly (which would entangle with
-    // MIN_OBSTACLE_GAP_COLS/lastObstacleAbsI's generation-time sequencing —
-    // exactly what spawnGap()'s decorative-telegraph design avoids too).
-    ctx.fillStyle = "#0a0f0c"; // --void
+    // Erase the ground stripe. drawTerrain() paints candles afterward so any
+    // ordinary collision geometry in this span remains visible.
+    ctx.fillStyle = "#0b1220"; // --void
     ctx.globalAlpha = 1;
     ctx.fillRect(x0, baseline-GAP_VOID_HEIGHT_PX, x1-x0, GAP_VOID_HEIGHT_PX + (tSurf.h-baseline));
     ctx.strokeStyle = "#ff6b5c";
@@ -2174,208 +2050,185 @@
   }
 
   function drawTerrain(cam, idx){
-    var ctx = tSurf.ctx, w=tSurf.w, h=tSurf.h;
+    var ctx = tSurf.ctx, w = tSurf.w, h = tSurf.h, baseline = baselineY();
     ctx.clearRect(0,0,w,h);
-    ctx.fillStyle = "#0d1611";
-    ctx.fillRect(0,0,w,h);
-
-    ctx.strokeStyle = "rgba(110,242,160,.05)";
-    ctx.lineWidth = 1;
-    for (var gx=0; gx<w; gx+=40){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
-
-    // M5.75: price-lane pane frame + divider, drawn every frame (including setup)
-    // so the layout reads as three fixed panes from the very first frame, same as a
-    // real trading platform's chart shell before any data loads.
-    ctx.fillStyle = "rgba(110,242,160,.035)";
-    ctx.fillRect(0, PRICE_LANE_TOP_PX - 6, w, PRICE_LANE_H + 12);
-    ctx.strokeStyle = "rgba(110,242,160,.18)";
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, PRICE_LANE_TOP_PX + PRICE_LANE_H + 6); ctx.lineTo(w, PRICE_LANE_TOP_PX + PRICE_LANE_H + 6); ctx.stroke();
-    ctx.font = "11px 'IBM Plex Mono', monospace";
-    ctx.fillStyle = "rgba(216,245,226,.4)";
-    ctx.fillText("PRICE", 6, PRICE_LANE_TOP_PX - 10);
-
-    var baseline = baselineY();
-    ctx.strokeStyle = "#2c5b3f";
-    ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
-
-    // M5.75: volume-pane frame, reserved by VOL_PANE_H in baselineY(). Labeled
-    // explicitly so the strip reads as its own object, not a second price series.
-    ctx.strokeStyle = "rgba(216,245,226,.12)";
-    ctx.beginPath(); ctx.moveTo(0, tSurf.h - BASE_MARGIN - VOL_PANE_H); ctx.lineTo(w, tSurf.h - BASE_MARGIN - VOL_PANE_H); ctx.stroke();
-    ctx.fillStyle = "rgba(216,245,226,.32)";
-    ctx.fillText("VOL", 6, tSurf.h - BASE_MARGIN - VOL_PANE_H + 12);
-
-    // M2: `bars` is now a continuously-streaming window that's never null (and keeps
-    // generating during setup too — see ensureBarsGenerated()). The blind-commit
-    // reveal is still gated on phase here, same UX contract as before, just no
-    // longer keyed off a null/non-null `bars` sentinel. Judgment call: not moving
-    // this gate to the ladder is intentional — the setup-only reveal mechanic itself
-    // belongs to M4, not M2, which only touches how the terrain data is generated.
-    if (phase !== "setup"){
-      var startI = Math.max(0, Math.floor(cam/COLW)-1);
-      var endI = Math.ceil((cam+w)/COLW)+1; // no upper clamp — index space is unbounded now
-      for (var i=startI;i<=endI;i++){
-        var b = barAt(i);
-        if (!b) continue; // outside the generated/kept window — shouldn't normally happen given the ahead-buffer
-        var sx = i*COLW - cam;
-        var col = b.bull ? "#6ef2a0" : "#ff6b5c";
-        // M5.5: playtester feedback ("can't see some of these candles") traced in
-        // part to a WYSIWYG gap — an obstacle's drawn body used its own clamp floor
-        // (4px) while its actual jump-clearance hitbox (hurdlePx) used a taller
-        // floor (18px, see classifyBar()), so a barely-qualifying obstacle could be
-        // hit well above where it visibly appeared to end. Obstacles now draw at
-        // exactly hurdlePx — the same number the collision test uses — so what's
-        // shown is what has to be cleared. Non-obstacle bars are unaffected.
-        var bodyPx = b.isObstacle ? b.hurdlePx : clamp((b.top-b.bottom)*MAXH, 4, 85);
-        var topY = baseline - bodyPx;
-
-        // M5.5: non-obstacle (ambient) bars were dimmed enough (.45/.3) that
-        // playtesters read them as hard to see, not just intentionally de-emphasized.
-        // Raised both alphas a step — still clearly duller than a full-opacity,
-        // white-outlined obstacle, just no longer washed out against --void.
-        ctx.globalAlpha = b.isObstacle ? 1 : .58;
-        ctx.fillStyle = col;
-        ctx.fillRect(sx+3, topY, COLW-6, bodyPx);
-        if (b.isObstacle){
-          ctx.strokeStyle = "#fff";
-          ctx.globalAlpha = .6;
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(sx+3, topY, COLW-6, bodyPx);
-        }
-        ctx.globalAlpha = b.isObstacle ? .7 : .42;
-        ctx.strokeStyle = col;
-        var wickPx = bodyPx + (b.wickHi-b.top)*MAXH*0.6;
-        ctx.beginPath();
-        ctx.moveTo(sx+COLW/2, topY);
-        ctx.lineTo(sx+COLW/2, baseline-wickPx);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
-        // M5.75: the real, level-preserving candlestick reference pane — see the
-        // comment above mapPriceY(). Drawn from the same `b` as the runway hurdle
-        // just above, so it's honestly the same tape shown twice, not a second
-        // fabricated data source. Thin body + wick both above AND below the body
-        // (unlike the runway hurdle, which only ever grows up from baseline) is
-        // what actually reads as a candlestick rather than a column.
-        var pBodyTop = mapPriceY(b.top), pBodyBottom = mapPriceY(b.bottom);
-        var pBodyH = Math.max(1.5, pBodyBottom - pBodyTop);
-        ctx.globalAlpha = b.isObstacle ? .95 : .55;
-        ctx.fillStyle = col;
-        ctx.fillRect(sx+7, pBodyTop, COLW-14, pBodyH);
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(sx+COLW/2, mapPriceY(b.wickHi));
-        ctx.lineTo(sx+COLW/2, mapPriceY(b.wickLo));
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-
-        // M5.75: volume pane — reuses bodyMag, the exact magnitude-from-zero shape
-        // the runway used to (mis)represent as price. Same data, honestly labeled.
-        var volPx = clamp(b.bodyMag*VOL_PANE_H*1.05, 2, VOL_PANE_H-4);
-        var volBaseY = tSurf.h - BASE_MARGIN;
-        ctx.globalAlpha = .5;
-        ctx.fillStyle = col;
-        ctx.fillRect(sx+5, volBaseY - volPx, COLW-10, volPx);
-        ctx.globalAlpha = 1;
-
-        if (b.resolved){
-          ctx.globalAlpha = .35;
-          ctx.fillStyle = "#0d1611";
-          ctx.fillRect(sx, 0, COLW, h);
-          ctx.globalAlpha = 1;
-        }
+    ctx.fillStyle = "#101c2d"; ctx.fillRect(0,0,w,h);
+    var startI = Math.max(0, Math.floor(cam/COLW)-1), endI = Math.ceil((cam+w)/COLW)+1;
+    if (startI !== chartWindowStartI || endI !== chartWindowEndI){
+      chartWindowStartI = startI; chartWindowEndI = endI;
+      var lo = 1, hi = 0;
+      for (var si=startI;si<=endI;si++){
+        var sample = barAt(si);
+        if (sample){ lo = Math.min(lo,sample.wickLo); hi = Math.max(hi,sample.wickHi); }
       }
-      // M5a: hazards are part of "the tape" the same way bars are, so they share
-      // the setup-phase blind-commit gate above rather than getting their own.
-      drawHazards(ctx, cam, w);
-    } else {
-      // Setup phase: a round isn't locked in yet. The tape stays hidden on purpose —
-      // placement can't be biased by seeing it first — even though (as of M2) bars are
-      // actually being generated continuously behind the scenes the whole time. With
-      // nothing drawn here the panel would read as broken (grid + player, nothing
-      // else), which is exactly what got reported as a rendering bug. This on-canvas
-      // cue doesn't reveal any tape data — it only explains the empty state.
-      ctx.textAlign = "center";
-      ctx.fillStyle = "rgba(216,245,226,.42)";
-      ctx.font = "20px 'VT323', monospace";
-      ctx.fillText("TAPE IS HIDDEN UNTIL YOU LOCK IN", w/2, h/2 - 8);
-      ctx.fillStyle = "rgba(216,245,226,.26)";
-      ctx.font = "13px 'IBM Plex Mono', monospace";
-      ctx.fillText("set your starting leverage on the ladder to start the run", w/2, h/2 + 15);
-      ctx.textAlign = "left";
+      if (hi > lo){
+        var span = Math.max(.28,hi-lo)*1.2, mid = (hi+lo)/2;
+        chartLow = mid-span/2; chartHigh = mid+span/2;
+      }
     }
-
-    var px = player.x - cam - PLAYER_W/2;
-    ctx.shadowColor = "#6ef2a0";
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = "#d8f5e2";
-    ctx.fillRect(px, player.y, PLAYER_W, PLAYER_H);
-    ctx.shadowBlur = 0;
-
-    // M5.5: prune expired PnL-cause callouts (see spawnFloatText()) and draw the
-    // still-live ones, rising and fading over their lifetime. World-space x so they
-    // scroll with the tape like everything else they're labeling.
-    var ftNow = performance.now();
-    for (var ftI = floatingTexts.length - 1; ftI >= 0; ftI--){
-      if (ftNow - floatingTexts[ftI].startedAt > floatingTexts[ftI].duration) floatingTexts.splice(ftI, 1);
+    ctx.lineWidth = 1; ctx.strokeStyle = "#213047";
+    for (var gx = -(cam % (COLW*4));gx<w;gx+=COLW*4){
+      ctx.beginPath(); ctx.moveTo(gx,22); ctx.lineTo(gx,h-24); ctx.stroke();
     }
-    ctx.textAlign = "center";
-    for (var ftJ = 0; ftJ < floatingTexts.length; ftJ++){
-      var ft = floatingTexts[ftJ];
-      var age = (ftNow - ft.startedAt) / ft.duration; // 0..1
-      ctx.globalAlpha = 1 - age;
-      ctx.font = (ft.big ? "bold 18px" : "13px") + " 'VT323', monospace";
-      ctx.fillStyle = ft.color;
-      ctx.fillText(ft.text, ft.x - cam, ft.y - age*16);
+    for (var gy=0;gy<=3;gy++){
+      var y = PRICE_LANE_TOP_PX+gy*PRICE_LANE_H/3;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
     }
-    ctx.globalAlpha = 1;
-    ctx.textAlign = "left";
-
-    if (banner && performance.now() < banner.until){
-      ctx.font = "bold 30px 'VT323', monospace";
-      ctx.fillStyle = banner.color;
-      ctx.textAlign = "center";
-      ctx.shadowColor = banner.color;
-      ctx.shadowBlur = 12;
-      ctx.fillText(banner.text, w/2, h/2);
-      ctx.shadowBlur = 0;
-      ctx.textAlign = "left";
+    ctx.fillStyle = "#0c1726"; ctx.fillRect(0,PRICE_LANE_TOP_PX+PRICE_LANE_H+12,w,baseline-PRICE_LANE_TOP_PX-PRICE_LANE_H-12);
+    ctx.strokeStyle = "#4b617a";
+    ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    ctx.fillStyle = "#9aaec6";
+    ctx.fillText("CANDLE RUNWAY",12,PRICE_LANE_TOP_PX+PRICE_LANE_H+28);
+    ctx.fillText("Jump the brackets · wicks are safe",12,PRICE_LANE_TOP_PX+PRICE_LANE_H+42);
+    if (phase !== "setup"){
+      // Paint gaps before candle hitboxes so candles in gaps remain visible.
+      hazards.forEach(function(hz){if(hz.type==="gap")drawGap(ctx,cam,w,hz);});
+      for (var i=startI;i<=endI;i++){
+        var b = barAt(i); if (!b) continue;
+        var sx = i*COLW-cam, col = b.bull ? "#43d9ad" : "#fa7785";
+        // OHLC candles retain their real relative levels; the separate runway
+        // encodes jump clearance. Their shared x position connects the two.
+        ctx.globalAlpha = b.resolved ? .48 : 1;
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(sx+COLW/2,mapPriceY(b.wickHi)); ctx.lineTo(sx+COLW/2,mapPriceY(b.wickLo)); ctx.stroke();
+        var cy = mapPriceY(b.top), ch = Math.max(2,mapPriceY(b.bottom)-cy);
+        if (b.bull){ ctx.fillStyle="#101c2d"; ctx.fillRect(sx+6,cy,12,ch); ctx.strokeRect(sx+6,cy,12,ch); }
+        else ctx.fillRect(sx+6,cy,12,ch);
+        if (b.isObstacle){
+          var topY = baseline-b.hurdlePx;
+          // The translucent body and amber bounds cover the full collision band.
+          // The inset OHLC-style body is artwork, never a different hitbox.
+          ctx.fillStyle = col; ctx.globalAlpha = b.resolved ? .12 : .2;
+          ctx.fillRect(sx+3,topY,COLW-6,b.hurdlePx);
+          ctx.globalAlpha = b.resolved ? .35 : 1;
+          ctx.fillRect(sx+7,topY+4,COLW-14,Math.max(4,b.hurdlePx-8));
+          ctx.strokeStyle=col;
+          ctx.beginPath();ctx.moveTo(sx+12,topY-10);ctx.lineTo(sx+12,baseline);ctx.stroke();
+          ctx.strokeStyle="#f2bb66";ctx.lineWidth=1.5;
+          ctx.beginPath();ctx.moveTo(sx+3,baseline);ctx.lineTo(sx+3,topY);ctx.lineTo(sx+21,topY);ctx.lineTo(sx+21,baseline);ctx.stroke();
+          if (!b.resolved){
+            ctx.globalAlpha=.2;ctx.setLineDash([2,4]);
+            ctx.beginPath();ctx.moveTo(sx+12,mapPriceY(b.wickLo)+6);ctx.lineTo(sx+12,topY-14);ctx.stroke();ctx.setLineDash([]);
+          }
+        } else if (b.sampled){
+          ctx.globalAlpha=b.resolved?.25:.7;ctx.fillStyle=b.favorable?"#43d9ad":"#fa7785";
+          ctx.font="10px 'IBM Plex Mono', monospace";
+          ctx.fillText(b.favorable?"+":"−",sx+8,baseline-4);
+        }
+        // This is candle body magnitude, not traded volume.
+        var moveH = clamp(b.bodyMag/.16*(VOL_PANE_H-8),1,VOL_PANE_H-8);
+        ctx.globalAlpha=.55;ctx.fillStyle=col;
+        ctx.fillRect(sx+6,h-BASE_MARGIN-moveH,12,moveH);
+        ctx.globalAlpha=1;
+      }
+      drawHazards(ctx,cam,w);
+      // Stable price column; it only overlays the reference chart.
+      ctx.fillStyle="#101c2d";ctx.fillRect(w-55,0,55,PRICE_LANE_TOP_PX+PRICE_LANE_H+10);
+      ctx.fillStyle="#9aaec6";ctx.textAlign="right";ctx.font="10px 'IBM Plex Mono', monospace";
+      for (var tick=0;tick<=3;tick++) ctx.fillText(displayPrice(chartHigh-tick*(chartHigh-chartLow)/3),w-7,PRICE_LANE_TOP_PX+tick*PRICE_LANE_H/3+3);
+      ctx.textAlign="left";
+      var current=barAt(terrainIndexAt(player.x));
+      if (current){
+        var currentY=mapPriceY(current.close), currentColor=current.bull?"#43d9ad":"#fa7785";
+        ctx.strokeStyle=currentColor;ctx.globalAlpha=.45;ctx.setLineDash([4,4]);
+        ctx.beginPath();ctx.moveTo(0,currentY);ctx.lineTo(w-55,currentY);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+        ctx.fillStyle=currentColor;ctx.fillRect(w-55,currentY-9,55,18);
+        ctx.fillStyle="#0b1220";ctx.textAlign="right";ctx.fillText(displayPrice(current.close),w-6,currentY+3);ctx.textAlign="left";
+        ctx.fillStyle="#9aaec6";ctx.font="10px 'IBM Plex Mono', monospace";
+        ctx.fillText("O "+displayPrice(current.open)+"   H "+displayPrice(current.wickHi)+"   L "+displayPrice(current.wickLo)+"   C "+displayPrice(current.close),12,16);
+      }
+    }
+    var playerScreenX=player.x-cam;
+    ctx.strokeStyle="#8ca3bd";ctx.globalAlpha=.35;ctx.setLineDash([3,5]);
+    ctx.beginPath();ctx.moveTo(playerScreenX,24);ctx.lineTo(playerScreenX,baseline);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    // The position marker has a distinct white silhouette and side-colored spine.
+    ctx.fillStyle="#e6edf7";ctx.fillRect(playerScreenX-PLAYER_W/2,player.y,PLAYER_W,PLAYER_H);
+    ctx.fillStyle=direction==="LONG"?"#43d9ad":"#fa7785";
+    ctx.fillRect(playerScreenX-PLAYER_W/2,player.y,3,PLAYER_H);
+    ctx.fillStyle="#0b1220";ctx.fillRect(playerScreenX+1,player.y+4,3,3);
+    ctx.font="10px 'IBM Plex Mono', monospace";ctx.fillStyle="#e6edf7";
+    ctx.textAlign="center";ctx.fillText("YOU",playerScreenX,baseline+13);ctx.textAlign="left";
+    var ftNow=performance.now();
+    floatingTexts=floatingTexts.filter(function(ft){return ftNow-ft.startedAt<ft.duration;});
+    ctx.textAlign="center";
+    floatingTexts.forEach(function(ft){
+      var age=(ftNow-ft.startedAt)/ft.duration;
+      ctx.globalAlpha=1-age;ctx.font=(ft.big?"600 15px":"12px")+" 'IBM Plex Mono', monospace";
+      ctx.fillStyle=ft.color;ctx.fillText(ft.text,ft.x-cam,ft.y-(reducedMotion?0:age*16));
+    });
+    ctx.globalAlpha=1;ctx.textAlign="left";
+    ctx.fillStyle="#9aaec6";ctx.font="9px 'IBM Plex Mono', monospace";
+    ctx.fillText("Price move",12,h-8);
+    ctx.textAlign="right";ctx.fillText(Math.floor(rampDistancePx/COLW)+" bars traveled",w-12,h-8);ctx.textAlign="left";
+    if (banner && performance.now()<banner.until){
+      ctx.fillStyle="#0b1220e8";ctx.fillRect(w/2-120,h/2-28,240,54);
+      ctx.fillStyle="#fa7785";ctx.font="600 25px 'IBM Plex Sans', sans-serif";ctx.textAlign="center";
+      ctx.fillText("Margin called",w/2,h/2+8);ctx.textAlign="left";
     }
   }
 
+  function hazardName(type){
+    return {candle:"Candle",volSpikes:"Volume cluster",wall:"Support / resistance",gannFan:"Gann fan",tunnel:"MA channel",gap:"News gap"}[type] || "Risk limit";
+  }
+  // Shared with marginCall()'s recovery tip so the two can't drift apart —
+  // one entry per hazard type in testHazardCollision()/hazardName().
+  var HAZARD_RECOVERY_TIP = {
+    wall: "Watch for support/resistance and hold your jump through the line.",
+    volSpikes: "Hold jump longer to carry across the whole hazard.",
+    gap: "Hold jump longer to carry across the whole hazard.",
+    tunnel: "Stay between the amber lines through MA channels.",
+    gannFan: "Time your jump through the Gann fan lines."
+  };
+  function nextActionCue(){
+    if (phase === "setup") return "Your first move: start the tape.";
+    if (phase === "gameover") return "Margin called. Your peak P&L is your final score.";
+    if (paused || helpOpen) return "Paused. Your position and course are held.";
+    var distance=Infinity, cue="Read the tape. Small candles change P&L as you pass.";
+    var start=terrainIndexAt(player.x);
+    for (var i=start;i<start+24;i++){
+      var bar=barAt(i);
+      if (bar && bar.isObstacle && !bar.resolved){
+        distance=i*COLW-player.x;cue="Marked candle · tap jump";break;
+      }
+    }
+    hazards.forEach(function(hz){
+      var x=hz.type==="gannFan"?hz.pivotX:hz.xStart;
+      if (hz.xEnd<player.x || x-player.x>distance || x>cam+tSurf.w) return;
+      var action;
+      if(hz.type==="wall") action=hz.hostile?(hz.role==="resistance"?"Resistance · stay low":"Support · hold jump"):"Passable "+hz.role+" · keep your rhythm";
+      else if(hz.type==="volSpikes") action="Volume cluster · one held jump";
+      else if(hz.type==="gap") action="News gap · hold jump across the void";
+      else if(hz.type==="tunnel") action="MA channel · stay between the amber lines";
+      else action="Gann fan · time your jump through the lines";
+      distance=Math.max(0,x-player.x);cue=action;
+    });
+    if(distance<Infinity) cue=(distance<=0?"Now: ":"Next: ")+cue;
+    return cue;
+  }
+  function setText(id,text){var el=document.getElementById(id);if(el.textContent!==text)el.textContent=text;}
   function updateHud(){
-    var posEl = document.getElementById("hudPosition");
-    var levEl = document.getElementById("hudLeverage");
-    var pnlEl = document.getElementById("hudPnl");
-    var equityEl = document.getElementById("hudEquity");
-    var cushionEl = document.getElementById("hudCushion");
-    posEl.textContent = direction;
-    posEl.className = direction === "LONG" ? "up" : "down";
-    levEl.textContent = phase === "running" ? (leverage + "x") : "—";
-    pnlEl.textContent = (pnlTicks >= 0 ? "+" : "") + pnlTicks;
-    pnlEl.className = pnlTicks >= 0 ? "up" : "down";
-    // M6: EQUITY/CUSHION replace the old TO STOP/TO LIMIT readouts — cushion is
-    // remaining drawdown room before a margin call at the *current* leverage (see
-    // marginCushionRemainingTicks()), so it visibly shrinks as the player levers up.
-    equityEl.textContent = phase === "running" ? Math.round(equity) : "—";
-    cushionEl.textContent = phase === "running" ? Math.round(marginCushionRemainingTicks()) : "—";
-    // M6: SCORE now shows hwmTicks live (the same value that gets submitted to the
-    // leaderboard at game-over) instead of the retired round-banked `score` var.
-    // ROUND is gone from the toolbar — M7 removed the `round` var entirely, since
-    // rounds no longer exist as a concept and a frozen counter was never useful.
-    document.getElementById("scoreVal").textContent = hwmTicks;
-
-    // M5.5: always-visible core-loop statement (see .loopCue in <style> for why
-    // this isn't gated behind Help). Candle color (bull=green/bear=red) is fixed
-    // regardless of direction — only which color is hostile depends on it — so
-    // this has to be recomputed from the live `direction`, not hardcoded copy.
-    var hostileWord = direction === "LONG" ? "red" : "green";
-    var favorableWord = direction === "LONG" ? "green" : "red";
-    document.getElementById("loopCue").innerHTML = direction +
-      " &mdash; dodge <span class=\"down\">" + hostileWord + "</span> candles (contact costs PnL) &middot; " +
-      "<span class=\"up\">" + favorableWord + "</span> ones pay you just for passing under them, no jump needed.";
+    var posEl=document.getElementById("hudPosition");
+    setText("hudPosition",direction);posEl.className=direction==="LONG"?"up":"down";
+    setText("hudLeverage",leverage+"×");
+    setText("hudPnl",(pnlTicks>=0?"+":"")+pnlTicks);
+    document.getElementById("hudPnl").className=pnlTicks>=0?"up":"down";
+    setText("scoreVal",String(hwmTicks));
+    var allowance=BASE_CUSHION/leverage;
+    var remaining=phase==="setup"?allowance:marginCushionRemainingTicks();
+    setText("hudCushion",remaining.toFixed(1));
+    document.getElementById("marginMeter").value=remaining/allowance;
+    setText("marginHint",phase==="setup"?(leverage===1?"1× gives you room to learn.":"At "+leverage+"×, one candle hit costs "+3*leverage+" ticks.") :
+      remaining<=3*leverage?"One candle hit could end this run.":remaining.toFixed(1)+" ticks of drawdown room.");
+    setText("setupPosition",direction+" · "+leverage+"× leverage");
+    setText("sessionStatus",phase==="setup"?"Ready to open":phase==="gameover"?"Session closed":paused||helpOpen?"Paused":"Tape live");
+    document.getElementById("pauseBtn").disabled=phase!=="running";
+    if (!paused) setText("pauseBtn","Pause · P");
+    var favorable=direction==="LONG"?"Green":"Red";
+    var cue='<span class="legendMark">⌜⌝</span> <strong>Jump the marked candles.</strong> '+favorable+' favors your '+direction.toLowerCase()+'. Small candles affect P&amp;L without contact.';
+    var loop=document.getElementById("loopCue");if(loop.dataset.direction!==direction){loop.innerHTML=cue;loop.dataset.direction=direction;}
+    setText("nextCue",nextActionCue());
+    setText("lastFill",lastFeedback||"Fills appear here as you run.");
   }
 
   // ----------------------------------------------------------------- LADDER
@@ -2431,9 +2284,12 @@
   //    rung, and crossing the BID_N boundary flips `direction` (and reclassifies
   //    the tape ahead of the lockout window — see reclassifyUnresolvedBars()).
   function doLadderMove(delta){
+    if (paused || helpOpen) return;
     if (phase === "setup"){
       var prevIdx = ladderPlayer.idx;
       ladderPlayer.idx = clamp(ladderPlayer.idx+delta, 0, TOTAL-1);
+      direction = ladderPlayer.idx < BID_N ? "SHORT" : "LONG";
+      leverage = idxToTicks(ladderPlayer.idx);
       if (ladderPlayer.idx !== prevIdx) SoundFX.climbStep();
       return;
     }
@@ -2464,6 +2320,8 @@
   // one press: whatever rung the cursor is sitting on becomes the starting
   // leverage the run locks in with.
   function confirmStartingLeverage(){
+    if (phase !== "setup" || helpOpen) return;
+    direction = ladderPlayer.idx < BID_N ? "SHORT" : "LONG";
     leverage = idxToTicks(ladderPlayer.idx);
     lockInPosition();
   }
@@ -2473,11 +2331,12 @@
     // (see ensureBarsGenerated()); RNG just keeps advancing. Only the per-round
     // vertical physics reset (not cam/player.x) happens on this transition.
     resetTerrainPlayerVerticals();
-    pnlTicks = 0;
-    hwmTicks = 0;
-    equity = BASE_EQUITY;
-    lastHitSource = null; // harness support: don't carry a stale deathCause into a new run
+    // pnlTicks/hwmTicks/equity/lastHitSource are already zeroed by newRound()/resetRun()
+    // and nothing can mutate them during setup, so this transition doesn't re-zero them.
     phase = "running";
+    clearInput();
+    document.getElementById("setupCard").hidden = true;
+    document.getElementById("terrainCanvas").focus({preventScroll:true});
     // M6: `leverage` and ladderPlayer.idx are already whatever the player just
     // confirmed in confirmStartingLeverage() above — no more hardcoding leverage=1
     // and re-snapping the cursor back to the entry rung. The blind starting-leverage
@@ -2502,6 +2361,7 @@
     ladderPlayer.idx = ticksToIdx(sideForDirection(direction), 1);
     resetTerrainPlayerVerticals();
     phase = "setup";
+    document.getElementById("setupCard").hidden = false;
     banner = null;
     floatingTexts.length = 0; // M5.5: don't carry stale PnL-cause callouts across a round boundary
     updateHud();
@@ -2518,85 +2378,34 @@
   }
 
   function drawLadder(){
-    var ctx = lSurf.ctx, w=lSurf.w, h=lSurf.h;
-    ctx.clearRect(0,0,w,h);
-    ctx.fillStyle = "#0d1611";
-    ctx.fillRect(0,0,w,h);
-
-    var maxSize = 0;
-    for (var k=0;k<levels.length;k++) maxSize = Math.max(maxSize, levels[k].size);
-
-    // M6: setup is a single leverage placement across the full ladder now (see
-    // doLadderMove()) — every row is a valid choice, so the old dim-invalid-rows
-    // treatment (tied to the removed side-restricted stop/limit range) is gone.
-    // The cursor's own row stays highlighted at full opacity in both phases; the
-    // old STOP/LIMIT row labels are gone too since nothing else is pinned to a
-    // fixed row anymore.
-    for (var i=0;i<levels.length;i++){
-      var lv = levels[i];
-      var row = ladderRowY(i);
-      var barW = 30 + (w-90) * (lv.size/maxSize);
-      var x = (w-barW)/2;
-      var col = lv.side==="bid" ? "#6ef2a0" : "#ff6b5c";
-
-      ctx.globalAlpha = i===ladderPlayer.idx ? 1 : .68;
-      ctx.fillStyle = col;
-      ctx.fillRect(x, row.y+3, barW, row.h-6);
-      ctx.globalAlpha = 1;
-
-      ctx.fillStyle = "#0a0f0c";
-      ctx.font = "11px 'IBM Plex Mono', monospace";
-      ctx.textBaseline = "middle";
-      ctx.fillText(lv.size, x+8, row.y+row.h/2);
-
-      ctx.fillStyle = "#7fa38c";
-      ctx.textAlign = "right";
-      ctx.fillText(lv.price.toFixed(2), w-8, row.y+row.h/2);
-      ctx.textAlign = "left";
-
-      // M6: the cursor row is the live leverage rung in both setup (starting
-      // choice) and running (live control) phases.
-      if (ladderPlayer.idx===i){
-        ctx.fillStyle = "#d8f5e2";
-        ctx.font = "bold 10px 'IBM Plex Mono', monospace";
-        ctx.fillText(idxToTicks(i) + "x", x+8, row.y+row.h/2-9);
+    var ctx=lSurf.ctx,w=lSurf.w,h=lSurf.h;
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#101c2d";ctx.fillRect(0,0,w,h);
+    var maxSize=Math.max.apply(null,levels.map(function(lv){return lv.size;}));
+    ctx.textBaseline="middle";ctx.font="16px 'IBM Plex Mono', monospace";
+    levels.forEach(function(lv,i){
+      var row=ladderRowY(i), center=row.y+row.h/2, selected=i===ladderPlayer.idx;
+      var bid=lv.side==="bid", color=bid?"#43d9ad":"#fa7785";
+      var depthW=lv.size/maxSize*96;
+      ctx.fillStyle=selected?"#263b54":i%2?"#122033":"#101c2d";ctx.fillRect(0,row.y,w,row.h);
+      ctx.fillStyle=color;ctx.globalAlpha=selected?.32:.16;
+      ctx.fillRect(bid?121-depthW:239,row.y+2,depthW,row.h-4);ctx.globalAlpha=1;
+      ctx.fillStyle=color;ctx.textAlign=bid?"right":"left";ctx.fillText(String(lv.size),bid?110:250,center);
+      ctx.fillStyle=selected?"#e6edf7":"#b4c4d7";ctx.textAlign="center";ctx.fillText(lv.price.toFixed(2),w/2,center);
+      if(selected){
+        ctx.strokeStyle="#f2bb66";ctx.lineWidth=1;ctx.strokeRect(.5,row.y+.5,w-1,row.h-1);
+        ctx.fillStyle="#f2bb66";ctx.textAlign="left";ctx.font="600 11px 'IBM Plex Mono', monospace";
+        ctx.fillText(idxToTicks(i)+"×",9,center);ctx.font="16px 'IBM Plex Mono', monospace";
       }
-    }
-
-    var mid = (ladderRowY(BID_N-1).y + ladderRowY(BID_N).y + ladderRowY(BID_N).h) / 2;
-    ctx.strokeStyle = "#2c5b3f";
-    ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = "#7fa38c";
-    ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.fillText("ENTRY", 8, mid-8);
-
-    // M4: the cursor marker is live in both setup and running phase (see
-    // doLadderMove()'s two phase branches).
-    if (phase === "setup" || phase === "running"){
-      var pr = ladderRowY(ladderPlayer.idx);
-      ctx.shadowColor = "#d8f5e2";
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = "#d8f5e2";
-      ctx.fillRect(w/2-6, pr.y+pr.h/2-6, 12, 12);
-      ctx.shadowBlur = 0;
-    }
+    });
+    var mid=(ladderRowY(BID_N-1).y+ladderRowY(BID_N).y+ladderRowY(BID_N).h)/2;
+    ctx.fillStyle="#0b1220";ctx.fillRect(0,mid-8,w,16);
+    ctx.fillStyle="#9aaec6";ctx.textAlign="center";ctx.font="10px 'IBM Plex Mono', monospace";
+    ctx.fillText("Entry "+basePrice.toFixed(2)+" · cross to flip",w/2,mid);
+    ctx.textAlign="left";ctx.textBaseline="alphabetic";
   }
-
   function updateLadderHud(){
-    if (phase === "setup"){
-      lLevelEl.innerHTML = "<b>SET STARTING LEVERAGE</b> &mdash; " + idxToTicks(ladderPlayer.idx) + "x";
-    } else if (phase === "running"){
-      // M6: leverage/direction stay live here (M4). The old fixed STOP/LIMIT
-      // distances are gone — replaced with the same live EQUITY/CUSHION figures
-      // the main HUD shows, so the ladder panel alone tells you how much room is
-      // left before a margin call without cross-referencing the terrain panel.
-      var dirCls = direction === "LONG" ? "up" : "down";
-      lLevelEl.innerHTML = '<b class="' + dirCls + '">' + leverage + 'x ' + direction + '</b>' +
-        ' &middot; EQUITY ' + Math.round(equity) +
-        ' &middot; CUSHION ' + Math.round(marginCushionRemainingTicks());
-    }
+    var text=leverage+"× "+direction+" · "+(phase==="setup"?"starting position":phase==="gameover"?"session closed":"live position");
+    if(lLevelEl.textContent!==text)lLevelEl.textContent=text;
   }
 
   // ------------------------------------------------------------ LEADERBOARD
@@ -2657,7 +2466,7 @@
     document.getElementById("gameOverOverlay").hidden = false;
     var input = document.getElementById("initialsInput");
     input.value = "";
-    input.focus();
+    document.getElementById("goPlayAgain").focus();
   }
 
   document.getElementById("goSubmit").addEventListener("click", function(){
@@ -2671,80 +2480,117 @@
       else renderLeaderboard(loadLocalScores(), true);
     });
     document.getElementById("goSubmit").disabled = true;
+    // Disabling the focused button blurs to <body>, which would let Tab escape
+    // this still-open dialog's focus trap — keep focus inside it.
+    document.getElementById("goPlayAgain").focus({preventScroll:true});
   });
   document.getElementById("goPlayAgain").addEventListener("click", function(){
     resetRun();
   });
 
-  // -------------------------------------------------------------- HELP UI
+  // Shared input gates keep help, pause, and touch consistent.
   var helpBtn = document.getElementById("helpBtn");
+  // Only clears transient jump-buffer state, not keysHeld: keydown/keyup already
+  // track which keys are physically down (keydown is gated while paused/help is
+  // open, keyup never is), so a key genuinely held across a pause/help interlude
+  // must stay held on resume — clearing it here would silently truncate a jump
+  // held the whole time (the OS repeats, rather than resends, a held keydown).
+  function clearInput(){ jumpQueued = false; jumpBufferMs = 0; jumpHoldMs = 0; }
+  // Full release: used when we can't trust keyup to arrive (window blur/hide),
+  // so a key held at that moment must not read as held after refocusing.
+  function releaseAllInput(){ keysHeld = {}; clearInput(); }
+  function setPaused(v){
+    if (phase !== "running") return;
+    paused = v; clearInput();
+    document.getElementById("pauseCard").hidden = !v;
+    document.getElementById("pauseBtn").textContent = v ? "Resume · P" : "Pause · P";
+    (v ? document.getElementById("resumeBtn") : tCanvas).focus({preventScroll:true});
+  }
   function setHelpOpen(v){
-    helpOpen = v;
+    if (v) helpReturnFocus = document.activeElement;
+    helpOpen = v; clearInput();
     document.getElementById("helpOverlay").hidden = !v;
-    helpBtn.setAttribute("aria-pressed", v ? "true" : "false");
+    helpBtn.setAttribute("aria-expanded", v ? "true" : "false");
+    if (v) document.getElementById("helpClose").focus();
+    else if (helpReturnFocus) helpReturnFocus.focus({preventScroll:true});
   }
   helpBtn.addEventListener("click", function(){ setHelpOpen(!helpOpen); });
   document.getElementById("helpClose").addEventListener("click", function(){ setHelpOpen(false); });
-
-  // ------------------------------------------------------------------ INPUT
+  document.getElementById("pauseBtn").addEventListener("click", function(){ setPaused(!paused); });
+  document.getElementById("resumeBtn").addEventListener("click", function(){ setPaused(false); });
+  document.getElementById("startBtn").addEventListener("click", confirmStartingLeverage);
   document.getElementById("regen").addEventListener("click", resetRun);
+  document.getElementById("ladderUp").addEventListener("click", function(){ doLadderMove(1); focusGameControl(); });
+  document.getElementById("ladderDown").addEventListener("click", function(){ doLadderMove(-1); focusGameControl(); });
+  function focusGameControl(){ (phase==="setup"?document.getElementById("startBtn"):tCanvas).focus({preventScroll:true}); }
 
+  var GAMEPLAY_KEYS = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "];
   window.addEventListener("keydown", function(e){
-    var typing = document.activeElement && document.activeElement.id === "initialsInput";
-    if (!typing && ["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].indexOf(e.key)!==-1) e.preventDefault();
-
-    if (typing){
-      if (e.key === "Enter") document.getElementById("goSubmit").click();
+    var active = document.activeElement;
+    var dialog = helpOpen ? document.getElementById("helpOverlay") :
+      !document.getElementById("gameOverOverlay").hidden ? document.getElementById("gameOverOverlay") : null;
+    if (e.key === "Tab" && dialog){
+      var focusable = Array.from(dialog.querySelectorAll("button:not(:disabled),input"));
+      var first = focusable[0], last = focusable[focusable.length-1];
+      if (e.shiftKey && active === first){ e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last){ e.preventDefault(); first.focus(); }
       return;
     }
-    if (e.key === "Escape" && helpOpen){ setHelpOpen(false); return; }
-
-    keysHeld[e.key] = true;
-    if (e.key === "h" || e.key === "H"){ setHelpOpen(!helpOpen); return; }
-    if (e.key === "r" || e.key === "R"){ resetRun(); return; }
-    if (e.repeat) return;
-    if (e.key === "ArrowUp") jumpQueued = true;
-
-    // M4: W/S now drive the ladder in both "setup" (M6: choosing starting leverage)
-    // and "running" (live leverage/direction) phases — doLadderMove() itself branches
-    // on phase and no-ops outside both. Confirm (SPACE/Enter) stays setup-only; calling
-    // confirmStartingLeverage() while running would re-lock a position that's already
-    // locked in.
-    if (e.key === "w" || e.key === "W") doLadderMove(1);
-    if (e.key === "s" || e.key === "S") doLadderMove(-1);
-    if (phase === "setup" && (e.key === " " || e.key === "Enter")) confirmStartingLeverage();
+    if (active && active.id === "initialsInput" && e.key === "Enter"){
+      e.preventDefault();
+      var submitBtn = document.getElementById("goSubmit");
+      if (!submitBtn.disabled) submitBtn.click();
+      return;
+    }
+    if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
+    // Preserve native keyboard activation for focused buttons.
+    if (active && active.tagName === "BUTTON" && (e.key === " " || e.key === "Enter")) return;
+    if (e.repeat){ if (GAMEPLAY_KEYS.includes(e.key)) e.preventDefault(); return; }
+    if (e.key.toLowerCase() === "h"){ e.preventDefault(); setHelpOpen(!helpOpen); return; }
+    if (helpOpen){
+      if (e.key === "Escape"){ e.preventDefault(); setHelpOpen(false); }
+      return;
+    }
+    if (e.key === "Escape" || e.key.toLowerCase() === "p"){ e.preventDefault(); setPaused(!paused); return; }
+    if (e.key.toLowerCase() === "r"){ e.preventDefault(); resetRun(); return; }
+    if (GAMEPLAY_KEYS.includes(e.key)) e.preventDefault();
+    if (paused || phase === "gameover") return;
+    if (phase === "setup" && (e.key === " " || e.key === "Enter")){ confirmStartingLeverage(); return; }
+    if (phase === "running" && (e.key === "ArrowUp" || e.key === " ")){ keysHeld[e.key] = true; jumpQueued = true; }
+    if (e.key.toLowerCase() === "w") doLadderMove(1);
+    if (e.key.toLowerCase() === "s") doLadderMove(-1);
   }, {passive:false});
-  window.addEventListener("keyup", function(e){ keysHeld[e.key]=false; });
+  window.addEventListener("keyup", function(e){ keysHeld[e.key] = false; });
+  // Skip setPaused() while help is open: gameplay is already fully frozen by
+  // helpOpen (see frame()'s gate), and forcing a pause here would also steal
+  // focus into the pause card and stack it behind the still-open help dialog,
+  // leaving the run stuck paused after help is closed even though the player
+  // never asked to pause.
+  window.addEventListener("blur", function(){ releaseAllInput(); if (!helpOpen) setPaused(true); });
+  document.addEventListener("visibilitychange", function(){ if (document.hidden){ releaseAllInput(); if (!helpOpen) setPaused(true); } });
 
-  // -------------------------------------------------------------- TOUCH UI
-  var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0) ||
-    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  var isTouchDevice = navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
   var touchControls = document.getElementById("touchControls");
   if (isTouchDevice){
     touchControls.classList.add("active");
     touchControls.setAttribute("aria-hidden", "false");
     document.body.classList.add("touchMode");
   }
-
-  function bindHold(el, onStart, onEnd){
-    el.addEventListener("pointerdown", function(e){ e.preventDefault(); onStart(); }, {passive:false});
-    ["pointerup","pointercancel","pointerleave"].forEach(function(ev){
-      el.addEventListener(ev, function(){ onEnd(); });
+  function bindJump(el){
+    el.addEventListener("pointerdown", function(e){
+      if (phase !== "running" || paused || helpOpen) return;
+      e.preventDefault(); el.setPointerCapture(e.pointerId);
+      jumpQueued = true; keysHeld["ArrowUp"] = true;
+    });
+    ["pointerup","pointercancel","lostpointercapture"].forEach(function(ev){
+      el.addEventListener(ev, function(){ keysHeld["ArrowUp"] = false; });
     });
   }
-  function bindTap(el, onTap){
-    el.addEventListener("pointerdown", function(e){ e.preventDefault(); onTap(); }, {passive:false});
-  }
-
-  Array.prototype.forEach.call(touchControls.querySelectorAll(".touchBtn"), function(btnEl){
-    var action = btnEl.getAttribute("data-action");
-    if (action === "left") bindHold(btnEl, function(){ keysHeld["ArrowLeft"]=true; }, function(){ keysHeld["ArrowLeft"]=false; });
-    else if (action === "right") bindHold(btnEl, function(){ keysHeld["ArrowRight"]=true; }, function(){ keysHeld["ArrowRight"]=false; });
-    else if (action === "jump") bindHold(btnEl, function(){ jumpQueued = true; keysHeld["ArrowUp"] = true; }, function(){ keysHeld["ArrowUp"] = false; });
-    else if (action === "climbUp") bindTap(btnEl, function(){ doLadderMove(1); });
-    else if (action === "climbDown") bindTap(btnEl, function(){ doLadderMove(-1); });
-    else if (action === "confirm") bindTap(btnEl, function(){ if (phase === "setup") confirmStartingLeverage(); });
-    else if (action === "restart") bindTap(btnEl, function(){ resetRun(); });
+  bindJump(tCanvas);
+  Array.prototype.forEach.call(touchControls.querySelectorAll(".touchBtn"), function(btn){
+    var action = btn.dataset.action;
+    if (action === "jump") bindJump(btn);
+    else btn.addEventListener("click", function(){ doLadderMove(action === "climbUp" ? 1 : -1); focusGameControl(); });
   });
 
   // ------------------------------------------------------------- TEST HARNESS
@@ -2778,6 +2624,7 @@
       }
       return {
         phase: phase,
+        paused: paused,
         direction: direction,
         leverage: leverage,
         pnlTicks: pnlTicks,
@@ -2813,7 +2660,7 @@
     // dt at 0 removes the asymmetry at the source instead of chasing it downstream.
     var dt = Math.max(0, Math.min(0.033, (now-last)/1000));
     last = now;
-    if (!helpOpen && phase !== "gameover"){
+    if (!helpOpen && !paused && phase === "running"){
       var t = updateTerrain(dt);
       lastCam = t.cam; lastIdx = t.idx;
       if (phase === "running"){ resolveObstacles(); resolveHazards(); }

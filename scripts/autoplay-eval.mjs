@@ -36,11 +36,11 @@
 // source or any policy file.
 
 import { chromium } from "playwright";
-import { createServer } from "node:http";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { extname, join, resolve, basename } from "node:path";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join, resolve, basename } from "node:path";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { serveDir, waitForHarness, getHarnessState } from "./lib/harness-util.mjs";
 
 function parseArgs(argv) {
   const args = { seeds: null, playDir: "plays/tape-and-ladder", pollMs: 40, maxMs: 120000, headed: false, out: null };
@@ -58,22 +58,6 @@ function parseArgs(argv) {
   args.policyPath = positional[0];
   if (!args.seeds) args.seeds = Array.from({ length: 10 }, (_, i) => i + 1);
   return args;
-}
-
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
-
-function serveDir(dir) {
-  return createServer(async (req, res) => {
-    const filePath = req.url.split("?")[0] === "/" ? join(dir, "index.html") : join(dir, req.url.split("?")[0]);
-    try {
-      const data = await readFile(filePath);
-      res.writeHead(200, { "Content-Type": MIME[extname(filePath)] || "application/octet-stream" });
-      res.end(data);
-    } catch {
-      res.writeHead(404);
-      res.end("not found");
-    }
-  });
 }
 
 function median(nums) {
@@ -105,14 +89,14 @@ async function runOneSeed({ page, url, seed, policy, pollMs, maxMs }) {
   // environments (e.g. a sandboxed CI/agent host). The game script itself needs
   // no external resource, and the waitForFunction below already confirms it ran.
   await page.goto(`${url}?seed=${seed}`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => !!window.__tapeAndLadder, null, { timeout: 10000 });
+  await waitForHarness(page, 10000);
   const actions = makeActions(page);
   if (typeof policy.reset === "function") await policy.reset();
 
   const start = Date.now();
   let lastState = null;
   while (Date.now() - start < maxMs) {
-    const state = await page.evaluate(() => window.__tapeAndLadder.getState());
+    const state = await getHarnessState(page);
     lastState = state;
     if (state.phase === "gameover") break;
     await policy.tick(state, actions);

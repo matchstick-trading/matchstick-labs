@@ -17,31 +17,14 @@
 // future play has different timing, this sequence won't transfer as-is.
 
 import { chromium } from "playwright";
-import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
-import { extname, join, resolve, basename } from "node:path";
+import { join, resolve, basename } from "node:path";
 import { existsSync } from "node:fs";
+import { serveDir } from "./lib/harness-util.mjs";
 
 const PLAY_DIR = resolve(process.argv[2] || "plays/tape-and-ladder");
 const PLAY_NAME = basename(PLAY_DIR);
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-");
 const OUT_DIR = resolve(process.argv[3] || `captures/${PLAY_NAME}-${STAMP}`);
-
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
-
-function serveDir(dir) {
-  return createServer(async (req, res) => {
-    const filePath = req.url === "/" ? join(dir, "index.html") : join(dir, req.url);
-    try {
-      const data = await readFile(filePath);
-      res.writeHead(200, { "Content-Type": MIME[extname(filePath)] || "application/octet-stream" });
-      res.end(data);
-    } catch {
-      res.writeHead(404);
-      res.end("not found");
-    }
-  });
-}
 
 async function main() {
   if (!existsSync(join(PLAY_DIR, "index.html"))) {
