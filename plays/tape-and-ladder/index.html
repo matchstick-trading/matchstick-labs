@@ -147,7 +147,7 @@
         <div class="setupCard" id="setupCard">
           <div class="lessonPreview" aria-hidden="true"><svg viewBox="0 0 118 48"><path d="M0 43h118" stroke="#425771"/><path d="M8 36Q47-19 85 36" stroke="#f2bb66" stroke-dasharray="3 4"/><path d="M61 9v33" stroke="#fa7785"/><path d="M55 20h12v17H55z" fill="#fa7785"/><path d="M51 17v26h20V17" stroke="#f2bb66" fill="none"/><rect x="5" y="29" width="9" height="14" fill="#e6edf7"/></svg></div>
           <h2>Trade your way through the tape.</h2>
-          <p>Jump marked candles. Hold to clear a cluster.<br>The tape runs automatically.</p>
+          <p>Jump amber gates. Read candles at their prices.<br>The tape runs automatically.</p>
           <div class="setupPosition" id="setupPosition">LONG · 1× leverage</div>
           <div class="setupActions"><button id="startBtn" class="primary" type="button">Start run <kbd>Space</kbd></button></div>
           <p class="startHint">Start at 1×. Use W / S or the ladder buttons to change risk.<br>The course reveals when you start.</p>
@@ -170,12 +170,12 @@
 <div id="helpOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
   <div class="overlayCard">
     <h2 id="helpTitle">Read the tape. Stay in the game.</h2>
-    <p>The tape runs automatically. Your job is to <b>jump the marked obstacles</b> and protect your margin. Start at <b>1× leverage</b> while you learn the rhythm.</p>
+    <p>The tape runs automatically. Your job is to <b>jump the amber gates</b> and protect your margin. Start at <b>1× leverage</b> while you learn the rhythm.</p>
     <div class="kbrow"><kbd>Space / ↑</kbd><span>Tap to jump. Hold for a higher, longer arc.</span></div>
     <div class="kbrow"><kbd>W / S</kbd><span>Move up / down the risk ladder. Crossing entry flips your side.</span></div>
     <div class="kbrow"><kbd>P / Esc</kbd><span>Pause or resume the run.</span></div>
     <div class="kbrow"><kbd>R</kbd><span>Start a fresh course.</span></div>
-    <div class="lesson"><b>Read the marks, not just the colors.</b><br>Green candles close higher; red candles close lower. Amber brackets mark a jump obstacle. Wicks are decoration. Small candles can still change P&amp;L when you pass them, even in the air.</div>
+    <div class="lesson"><b>Market context and arcade risk use different marks.</b><br>Green candles close higher; red candles close lower, all on the printed synthetic-price scale. A small amber marker connects a risk candle to its ground-level outline; only that outlined gate collides. Small candles can still change P&amp;L when you pass them, even in the air.</div>
     <p><b>Watch what comes next.</b> Hold through a movement cluster or a news gap. Stay low under resistance; land on support from above or jump it. Later, fans and moving-average channels add new timing challenges. The cue below the chart calls them out.</p>
     <p><b>Your score is your highest P&amp;L.</b> Every gain and loss is multiplied by leverage. A loss from your peak uses up margin; exceed the allowance and the run ends. This is an arcade scoring rule.</p>
     <button class="close primary" id="helpClose" type="button">Got it</button>
@@ -225,9 +225,10 @@
     return m ? (Number(m[1]) >>> 0) : (Date.now() & 0xffffffff);
   })();
   var rand = mulberry32(runSeed);
-  // Browser checks may request one deterministic support-only course. The hook is
-  // installed only for this explicit URL, never for an ordinary player session.
-  var supportTestMode = /[?&]test-support=1(?:&|$)/.test(location.search);
+  // Browser checks may request deterministic surface/geometry fixtures. The hooks
+  // are installed only for these explicit URLs, never for an ordinary player run.
+  // `test-support=1` remains accepted for Gate A/B compatibility.
+  var geometryTestMode = /[?&](?:test-support|test-geometry)=1(?:&|$)/.test(location.search);
 
   // -------------------------------------------------------------- SOUND FX
   var SoundFX = (function(){
@@ -485,7 +486,7 @@
     basePrice = 100 + Math.floor(rand()*40);
     bars = []; barsBaseIndex = 0; barsGenIndex = 0; barLevel = .5;
     barsClassifiedUpTo = 0; lastObstacleAbsI = -999;
-    chartWindowStartI = null; chartWindowEndI = null; // invalidate drawTerrain()'s chartLow/High cache
+    chartWindowStartI = null; chartWindowEndI = null; // reset visible-window diagnostics
     hazards = []; nextHazardX = 2400;
     hwmTicks = 0; equity = BASE_EQUITY; lastHitSource = null; lastFeedback = "";
     initTerrainPlayer(); lastCam = 0; lastIdx = terrainIndexAt(player.x);
@@ -515,31 +516,14 @@
   }
 
   var COLW = 24, MAXH = 230, BASE_MARGIN = 26;
-  // M5.75: playtester feedback ("why are we running on the volume bars? I expected
-  // candlesticks centered on the chart") traced to a real structural gap, not just a
-  // styling one — the runway has only ever drawn each bar's MAGNITUDE (top-bottom,
-  // always grown up from a zero baseline), never its LEVEL (where open/close/wick sit
-  // within the bar's own [0,1] random-walk range). A magnitude-from-zero bar chart is
-  // structurally a volume histogram no matter how it's colored; a price chart has to
-  // show the level moving. Fix: add a real, continuous, floating candlestick pane
-  // (PRICE_LANE_*) above the runway that plots every bar's actual open/close/wickHi/
-  // wickLo level via mapPriceY() — same underlying bar data, just finally showing
-  // level instead of only magnitude — plus an explicitly-labeled VOL_PANE_H strip
-  // below the (unchanged) runway showing bodyMag, since that magnitude-only shape is
-  // genuinely what a volume histogram looks like and deserves its own honest label
-  // instead of masquerading as price. Judgment call: left the runway/obstacle
-  // collision geometry (topY = baseline - hurdlePx, full solid column) completely
-  // untouched rather than detaching obstacles from baseline to float at their real
-  // price level too — that would turn every obstacle into a variable-height flying
-  // hazard (sometimes floating harmlessly overhead, sometimes blocking at head
-  // height, sometimes unavoidable) with its own fairness/timing model that M3/M5.5
-  // never tuned for and would need its own playtest cycle. That fuller "obstacles
-  // (and support/resistance) are lanes you jump between, not just hurdles" rework is
-  // deliberately deferred — see the M8 entry in Milestones below. M8 Gate A now
-  // makes support landable, but price-positioned candles and full lane navigation
-  // remain deferred; this price pane is still display-only.
+  // M8 Gate C: one fixed-scale playfield replaces the old split between an
+  // autoscaled decorative OHLC pane and price-colored magnitude columns at the
+  // runway. Candles and support/resistance now share normalized priceToGameplayY()
+  // geometry. Existing tuned collision remains at the baseline, but is rendered as
+  // an explicitly amber arcade JUMP GATE instead of masquerading as market data.
+  // Floating OHLC bodies are informational/non-collidable in this gate; making them
+  // landable requires its own reachability, scoring, and platform-grouping contract.
   var VOL_PANE_H = 42;
-  var PRICE_LANE_TOP_PX = 28, PRICE_LANE_H = 118;
   // M2 streaming terrain: bar-index space is unbounded (no more fixed N_BARS array —
   // "no more end of the world"). GEN_AHEAD_BARS is how far past the camera's leading
   // edge stays generated; DROP_MARGIN_BARS is the small trailing buffer kept behind
@@ -590,9 +574,9 @@
   var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
   // Gate B: walls carry price, not a separately mutable canvas Y. The normalized
   // gameplay-price range spans a fixed 230 logical pixels above the runway. This
-  // is deliberately independent of PRICE_LANE_* and its rolling display autoscale:
-  // changing the visible candle window must never move a surface under the player.
-  var GAMEPLAY_PRICE_HEIGHT_PX = 230;
+  // is deliberately independent of camera/world X: changing the visible candle
+  // window must never move a surface under the player.
+  var GAMEPLAY_PRICE_HEIGHT_PX = MAXH;
 
   // M5b hazard 2: moving-average tunnel. Not direction-conditional (unlike every
   // other hazard/candle) — a precision/restraint test, not a reflex-jump one, per
@@ -1065,8 +1049,8 @@
   }
 
   // One canonical geometry object feeds support landing, wall collision, drawing,
-  // and diagnostics. `priceNorm` is the sole vertical authority; mapPriceY() is a
-  // separate display-only autoscale and never participates in wall geometry.
+  // and diagnostics. `priceNorm` is the sole vertical authority shared with the
+  // fixed-scale candle playfield.
   function wallGeometry(hazard){
     var priceNorm = clamp(hazard.priceNorm, 0, 1);
     return {
@@ -1423,16 +1407,16 @@
     }
   }
 
-  // M5.75: reserves VOL_PANE_H px at the bottom of the canvas for the new volume
-  // strip. Every hurdle/collision/gap-void computation reads baselineY() as a
+  // M5.75: reserves VOL_PANE_H px at the bottom of the canvas for the price-move
+  // magnitude strip. Every hurdle/collision/gap-void computation reads baselineY() as a
   // function rather than a cached constant, so this one change uniformly shifts the
   // whole runway up by VOL_PANE_H and nothing else needs touching.
   function baselineY(){ return tSurf.h - BASE_MARGIN - VOL_PANE_H; }
 
   // Stable gameplay price-space, high price at the top. This fixed logical-canvas
   // transform is the inverse pair used when a wall is spawned and whenever its
-  // current render/collision geometry is requested. It does not read chartLow,
-  // chartHigh, camera position, or world X, so those systems cannot move a price.
+  // current render/collision geometry is requested. It does not read camera
+  // position or world X, so those systems cannot move a price.
   function priceToGameplayY(norm){
     return baselineY() - clamp(norm, 0, 1)*GAMEPLAY_PRICE_HEIGHT_PX;
   }
@@ -1440,20 +1424,56 @@
     return clamp((baselineY() - y)/GAMEPLAY_PRICE_HEIGHT_PX, 0, 1);
   }
 
-  // M5.75: maps a bar's normalized [0,1] price level (open/close/wickHi/wickLo — see
-  // genNextBar()) to a Y position inside the fixed PRICE_LANE_* band, high price at
-  // the top like every real price pane. Unlike the runway (which only ever shows a
-  // bar's magnitude), this preserves the bar's actual LEVEL, so the plotted line
-  // genuinely tracks the random walk up and down over time instead of always sitting
-  // on a zero baseline.
-  var chartLow = 0, chartHigh = 1;
-  // Rescan the visible bar window for chartLow/chartHigh only when that window
-  // actually shifts, not on every animation frame (see drawTerrain()).
+  // The visible window indexes remain diagnostic, but there is no second rolling
+  // price autoscale anymore: every market object and axis tick uses the fixed
+  // gameplay transform above.
   var chartWindowStartI = null, chartWindowEndI = null;
-  function mapPriceY(norm){
-    return PRICE_LANE_TOP_PX + PRICE_LANE_H - (norm-chartLow)/(chartHigh-chartLow)*PRICE_LANE_H;
-  }
   function displayPrice(norm){ return (basePrice + (norm-.5)*1.28).toFixed(2); }
+
+  var CANDLE_BODY_INSET_PX = 6;
+  function candleGameplayGeometry(bar, absIndex){
+    var worldX = absIndex*COLW;
+    return {
+      worldX:worldX,
+      bodyXStart:worldX+CANDLE_BODY_INSET_PX,
+      bodyXEnd:worldX+COLW-CANDLE_BODY_INSET_PX,
+      wickX:worldX+COLW/2,
+      bodyTopY:priceToGameplayY(bar.top),
+      bodyBottomY:priceToGameplayY(bar.bottom),
+      wickTopY:priceToGameplayY(bar.wickHi),
+      wickBottomY:priceToGameplayY(bar.wickLo)
+    };
+  }
+
+  var GAMEPLAY_PRICE_TICK_NORMS = [1, .75, .5, .25, 0];
+  function gameplayPriceTicks(){
+    var ticks = [];
+    for (var i=0;i<GAMEPLAY_PRICE_TICK_NORMS.length;i++){
+      var norm = GAMEPLAY_PRICE_TICK_NORMS[i];
+      ticks.push({ norm:norm, y:priceToGameplayY(norm), label:displayPrice(norm) });
+    }
+    return ticks;
+  }
+
+  function obstacleDiagnostics(bar, absIndex){
+    var priceGeometry = candleGameplayGeometry(bar, absIndex);
+    var collisionGeometry = obstacleGateGeometry(
+      absIndex*COLW+HIT_INSET_X,
+      (absIndex+1)*COLW-HIT_INSET_X,
+      bar.hurdlePx
+    );
+    return {
+      worldX:absIndex*COLW,
+      hurdlePx:bar.hurdlePx,
+      ohlc:{
+        open:bar.open, high:bar.wickHi, low:bar.wickLo, close:bar.close,
+        openLabel:displayPrice(bar.open), highLabel:displayPrice(bar.wickHi),
+        lowLabel:displayPrice(bar.wickLo), closeLabel:displayPrice(bar.close)
+      },
+      priceGeometry:priceGeometry,
+      collisionGeometry:collisionGeometry
+    };
+  }
   // No more upper clamp — bar-index space is unbounded now ("no more end of the
   // world"). Still floored at 0: world-space never goes negative.
   function terrainIndexAt(worldX){ return Math.max(0, Math.floor(worldX/COLW)); }
@@ -1639,12 +1659,19 @@
   // volSpikes must use "the same AABB hurdle rule as ordinary candles... not a
   // new collision mechanic," so this is the one true hurdle test now, and both
   // callers just supply their own band.
+  function obstacleGateGeometry(hx0, hx1, hurdlePx){
+    return {
+      xStart:hx0, xEnd:hx1,
+      topY:baselineY()-hurdlePx+HIT_INSET_TOP,
+      bottomY:baselineY()
+    };
+  }
+
   function obstacleHurdleOverlap(hx0, hx1, hurdlePx){
-    var baseline = baselineY();
-    var hTop = baseline - hurdlePx + HIT_INSET_TOP, hBot = baseline;
+    var gate = obstacleGateGeometry(hx0, hx1, hurdlePx);
     var px0 = player.x - PLAYER_W/2 + 2, px1 = player.x + PLAYER_W/2 - 2;
     var py0 = player.y + 2, py1 = player.y + PLAYER_H;
-    return px1 > hx0 && px0 < hx1 && py1 > hTop && py0 < hBot;
+    return px1 > gate.xStart && px0 < gate.xEnd && py1 > gate.topY && py0 < gate.bottomY;
   }
 
   function playerObstacleOverlap(b, i){
@@ -2116,63 +2143,52 @@
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "#101c2d"; ctx.fillRect(0,0,w,h);
     var startI = Math.max(0, Math.floor(cam/COLW)-1), endI = Math.ceil((cam+w)/COLW)+1;
-    if (startI !== chartWindowStartI || endI !== chartWindowEndI){
-      chartWindowStartI = startI; chartWindowEndI = endI;
-      var lo = 1, hi = 0;
-      for (var si=startI;si<=endI;si++){
-        var sample = barAt(si);
-        if (sample){ lo = Math.min(lo,sample.wickLo); hi = Math.max(hi,sample.wickHi); }
-      }
-      if (hi > lo){
-        var span = Math.max(.28,hi-lo)*1.2, mid = (hi+lo)/2;
-        chartLow = mid-span/2; chartHigh = mid+span/2;
-      }
-    }
+    chartWindowStartI = startI; chartWindowEndI = endI;
+    var priceTicks = gameplayPriceTicks(), priceTop = priceTicks[0].y;
+    ctx.fillStyle = "#0c1726"; ctx.fillRect(0,priceTop,w,baseline-priceTop);
     ctx.lineWidth = 1; ctx.strokeStyle = "#213047";
     for (var gx = -(cam % (COLW*4));gx<w;gx+=COLW*4){
-      ctx.beginPath(); ctx.moveTo(gx,22); ctx.lineTo(gx,h-24); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx,priceTop); ctx.lineTo(gx,baseline); ctx.stroke();
     }
-    for (var gy=0;gy<=3;gy++){
-      var y = PRICE_LANE_TOP_PX+gy*PRICE_LANE_H/3;
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+    for (var gy=0;gy<priceTicks.length;gy++){
+      ctx.beginPath(); ctx.moveTo(0,priceTicks[gy].y); ctx.lineTo(w,priceTicks[gy].y); ctx.stroke();
     }
-    ctx.fillStyle = "#0c1726"; ctx.fillRect(0,PRICE_LANE_TOP_PX+PRICE_LANE_H+12,w,baseline-PRICE_LANE_TOP_PX-PRICE_LANE_H-12);
     ctx.strokeStyle = "#4b617a";
     ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#9aaec6";
-    ctx.fillText("CANDLE RUNWAY",12,PRICE_LANE_TOP_PX+PRICE_LANE_H+28);
-    ctx.fillText("Jump the brackets · wicks are safe",12,PRICE_LANE_TOP_PX+PRICE_LANE_H+42);
+    ctx.fillText("PRICE + CHART OBJECTS",12,priceTop-16);
+    ctx.fillText("AMBER MARKER = RISK CANDLE · OUTLINE = JUMP GATE",12,priceTop-4);
     if (phase !== "setup"){
-      // Paint gaps before candle hitboxes so candles in gaps remain visible.
+      // Paint gaps before price candles and jump gates so both remain visible.
       hazards.forEach(function(hz){if(hz.type==="gap")drawGap(ctx,cam,w,hz);});
       for (var i=startI;i<=endI;i++){
         var b = barAt(i); if (!b) continue;
-        var sx = i*COLW-cam, col = b.bull ? "#43d9ad" : "#fa7785";
-        // OHLC candles retain their real relative levels; the separate runway
-        // encodes jump clearance. Their shared x position connects the two.
+        var candle = candleGameplayGeometry(b, i);
+        var sx = candle.worldX-cam, col = b.bull ? "#43d9ad" : "#fa7785";
+        // One fixed-scale market candle. Its price geometry is informational in
+        // Gate C; the separate amber gate below is the exact arcade collision.
         ctx.globalAlpha = b.resolved ? .48 : 1;
         ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(sx+COLW/2,mapPriceY(b.wickHi)); ctx.lineTo(sx+COLW/2,mapPriceY(b.wickLo)); ctx.stroke();
-        var cy = mapPriceY(b.top), ch = Math.max(2,mapPriceY(b.bottom)-cy);
-        if (b.bull){ ctx.fillStyle="#101c2d"; ctx.fillRect(sx+6,cy,12,ch); ctx.strokeRect(sx+6,cy,12,ch); }
-        else ctx.fillRect(sx+6,cy,12,ch);
+        ctx.beginPath(); ctx.moveTo(candle.wickX-cam,candle.wickTopY); ctx.lineTo(candle.wickX-cam,candle.wickBottomY); ctx.stroke();
+        var cy = candle.bodyTopY, ch = Math.max(2,candle.bodyBottomY-candle.bodyTopY);
+        var bodyX = candle.bodyXStart-cam, bodyW = candle.bodyXEnd-candle.bodyXStart;
+        if (b.bull){ ctx.fillStyle="#0c1726"; ctx.fillRect(bodyX,cy,bodyW,ch); ctx.strokeRect(bodyX,cy,bodyW,ch); }
+        else ctx.fillRect(bodyX,cy,bodyW,ch);
         if (b.isObstacle){
-          var topY = baseline-b.hurdlePx;
-          // The translucent body and amber bounds cover the full collision band.
-          // The inset OHLC-style body is artwork, never a different hitbox.
-          ctx.fillStyle = col; ctx.globalAlpha = b.resolved ? .12 : .2;
-          ctx.fillRect(sx+3,topY,COLW-6,b.hurdlePx);
+          var gate = obstacleGateGeometry(i*COLW+HIT_INSET_X, (i+1)*COLW-HIT_INSET_X, b.hurdlePx);
           ctx.globalAlpha = b.resolved ? .35 : 1;
-          ctx.fillRect(sx+7,topY+4,COLW-14,Math.max(4,b.hurdlePx-8));
-          ctx.strokeStyle=col;
-          ctx.beginPath();ctx.moveTo(sx+12,topY-10);ctx.lineTo(sx+12,baseline);ctx.stroke();
-          ctx.strokeStyle="#f2bb66";ctx.lineWidth=1.5;
-          ctx.beginPath();ctx.moveTo(sx+3,baseline);ctx.lineTo(sx+3,topY);ctx.lineTo(sx+21,topY);ctx.lineTo(sx+21,baseline);ctx.stroke();
-          if (!b.resolved){
-            ctx.globalAlpha=.2;ctx.setLineDash([2,4]);
-            ctx.beginPath();ctx.moveTo(sx+12,mapPriceY(b.wickLo)+6);ctx.lineTo(sx+12,topY-14);ctx.stroke();ctx.setLineDash([]);
-          }
+          // A small marker and faint dashed connector associate this price candle
+          // with the gate below. The closed amber outline is reserved exclusively
+          // for the actual collision geometry, so the floating body cannot read as
+          // a second jump target.
+          var markerX=candle.wickX-cam, markerY=Math.max(priceTop+4,candle.wickTopY-7);
+          ctx.fillStyle="#f2bb66";ctx.globalAlpha=b.resolved?.35:.9;
+          ctx.beginPath();ctx.moveTo(markerX,markerY+5);ctx.lineTo(markerX-4,markerY);ctx.lineTo(markerX+4,markerY);ctx.closePath();ctx.fill();
+          ctx.strokeStyle="#f2bb66";ctx.lineWidth=1;ctx.globalAlpha=b.resolved?.12:.25;ctx.setLineDash([2,4]);
+          ctx.beginPath();ctx.moveTo(markerX,candle.wickBottomY+4);ctx.lineTo(markerX,gate.topY-4);ctx.stroke();ctx.setLineDash([]);
+          ctx.globalAlpha = b.resolved ? .35 : 1;ctx.lineWidth=1.5;
+          ctx.strokeRect(gate.xStart-cam,gate.topY,gate.xEnd-gate.xStart,gate.bottomY-gate.topY);
         } else if (b.sampled){
           ctx.globalAlpha=b.resolved?.25:.7;ctx.fillStyle=b.favorable?"#43d9ad":"#fa7785";
           ctx.font="10px 'IBM Plex Mono', monospace";
@@ -2185,14 +2201,14 @@
         ctx.globalAlpha=1;
       }
       drawHazards(ctx,cam,w);
-      // Stable price column; it only overlays the reference chart.
-      ctx.fillStyle="#101c2d";ctx.fillRect(w-55,0,55,PRICE_LANE_TOP_PX+PRICE_LANE_H+10);
+      // The axis uses the same fixed transform as candles and walls.
+      ctx.fillStyle="#101c2d";ctx.fillRect(w-55,priceTop-10,55,baseline-priceTop+12);
       ctx.fillStyle="#9aaec6";ctx.textAlign="right";ctx.font="10px 'IBM Plex Mono', monospace";
-      for (var tick=0;tick<=3;tick++) ctx.fillText(displayPrice(chartHigh-tick*(chartHigh-chartLow)/3),w-7,PRICE_LANE_TOP_PX+tick*PRICE_LANE_H/3+3);
+      for (var tick=0;tick<priceTicks.length;tick++) ctx.fillText(priceTicks[tick].label,w-7,priceTicks[tick].y+3);
       ctx.textAlign="left";
       var current=barAt(terrainIndexAt(player.x));
       if (current){
-        var currentY=mapPriceY(current.close), currentColor=current.bull?"#43d9ad":"#fa7785";
+        var currentY=priceToGameplayY(current.close), currentColor=current.bull?"#43d9ad":"#fa7785";
         ctx.strokeStyle=currentColor;ctx.globalAlpha=.45;ctx.setLineDash([4,4]);
         ctx.beginPath();ctx.moveTo(0,currentY);ctx.lineTo(w-55,currentY);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
         ctx.fillStyle=currentColor;ctx.fillRect(w-55,currentY-9,55,18);
@@ -2251,7 +2267,7 @@
     for (var i=start;i<start+24;i++){
       var bar=barAt(i);
       if (bar && bar.isObstacle && !bar.resolved){
-        distance=i*COLW-player.x;cue="Marked candle · tap jump";break;
+        distance=i*COLW-player.x;cue="Amber jump gate · tap jump";break;
       }
     }
     hazards.forEach(function(hz){
@@ -2287,7 +2303,7 @@
     document.getElementById("pauseBtn").disabled=phase!=="running";
     if (!paused) setText("pauseBtn","Pause · P");
     var favorable=direction==="LONG"?"Green":"Red";
-    var cue='<span class="legendMark">⌜⌝</span> <strong>Jump the marked candles.</strong> '+favorable+' favors your '+direction.toLowerCase()+'. Small candles affect P&amp;L without contact.';
+    var cue='<span class="legendMark">⌜⌝</span> <strong>Jump amber gates.</strong> Price candles show synthetic market context; '+favorable+' favors your '+direction.toLowerCase()+'.';
     var loop=document.getElementById("loopCue");if(loop.dataset.direction!==direction){loop.innerHTML=cue;loop.dataset.direction=direction;}
     setText("nextCue",nextActionCue());
     setText("lastFill",lastFeedback||"Fills appear here as you run.");
@@ -2663,8 +2679,8 @@
   // page.keyboard — see doLadderMove()/the keydown handler above); nothing here
   // reads or short-circuits any gameplay code, so this has zero effect on normal
   // play and can't itself change what a policy is allowed to do. `getState()` is
-  // cheap enough to poll every frame: no allocation beyond one lookahead array per
-  // call, no DOM reads.
+  // cheap enough to poll every frame: it allocates only small bounded lookahead
+  // and axis diagnostic objects, with no DOM reads.
   window.__tapeAndLadder = {
     seed: runSeed,
     getState: function(){
@@ -2674,7 +2690,7 @@
         for (var i = centerIdx; i <= centerIdx + 24; i++){
           var b = barAt(i);
           if (b && b.isObstacle && !b.resolved){
-            upcomingObstacles.push({ worldX: i*COLW, hurdlePx: b.hurdlePx });
+            upcomingObstacles.push(obstacleDiagnostics(b, i));
           }
         }
       }
@@ -2712,9 +2728,9 @@
         onGround: player ? player.onGround : null,
         baselineY: baselineY(),
         chartWindow: {
-          startI:chartWindowStartI, endI:chartWindowEndI,
-          low:chartLow, high:chartHigh
+          startI:chartWindowStartI, endI:chartWindowEndI
         },
+        priceAxis:gameplayPriceTicks(),
         standingSurface: surface ? {
           type:"support", xStart:surface.xStart, xEnd:surface.xEnd,
           priceNorm:surface.priceNorm, displayPrice:surface.displayPrice,
@@ -2730,7 +2746,8 @@
 
   // Narrow mutation hook for the deterministic surface lifecycle smoke check.
   // It is unreachable unless the page was explicitly loaded with test-support=1.
-  if (supportTestMode){
+  if (geometryTestMode){
+    var obstacleTestBar = null;
     window.__tapeAndLadder.setSupportTestScenario = function(mode){
       if (phase !== "running") return null;
       var y = baselineY() - 36;
@@ -2764,14 +2781,6 @@
         landingY:geometry.y-PLAYER_H, playerHeight:PLAYER_H,
         hostile:support.hostile
       };
-    };
-
-    // Display autoscale is intentionally mutable only in this explicit test mode,
-    // allowing the smoke suite to prove that wall geometry does not read it.
-    window.__tapeAndLadder.setDisplayRangeForTest = function(low, high){
-      if (phase !== "running" || !(high > low)) return null;
-      chartLow = low; chartHigh = high;
-      return { low:chartLow, high:chartHigh };
     };
 
     // Round-trip the deterministic support-only world through the production M2
@@ -2816,6 +2825,70 @@
           displayPrice:after.displayPrice, gameplayY:after.y,
           screenX:after.xStart-cam
         }
+      };
+    };
+
+    window.__tapeAndLadder.setObstacleTestScenario = function(mode){
+      if (phase !== "running") return null;
+      var centerIdx = terrainIndexAt(player.x);
+      var offset = mode === "hit" ? 0 : (mode === "clear" ? 3 : 12);
+      var absIndex = centerIdx + offset;
+      for (var i=centerIdx-2;i<=absIndex+2;i++){
+        var existing = barAt(i);
+        if (existing){ existing.resolved = true; existing.isObstacle = false; }
+      }
+      obstacleTestBar = barAt(absIndex);
+      if (!obstacleTestBar) return null;
+      obstacleTestBar.open = .56;
+      obstacleTestBar.close = .48;
+      obstacleTestBar.top = .56;
+      obstacleTestBar.bottom = .48;
+      obstacleTestBar.wickHi = .60;
+      obstacleTestBar.wickLo = .44;
+      obstacleTestBar.bull = false;
+      obstacleTestBar.bodyMag = .08;
+      obstacleTestBar.bigEnough = true;
+      obstacleTestBar.sampled = true;
+      obstacleTestBar.resolved = false;
+      obstacleTestBar.classified = true;
+      obstacleTestBar.favorable = false;
+      obstacleTestBar.isObstacle = true;
+      obstacleTestBar.hurdlePx = 36;
+      hazards = [];
+      player.y = baselineY()-PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      player.standingSurface = null;
+      jumpQueued = false; jumpBufferMs = 0; jumpHoldMs = 0; keysHeld = {};
+      return obstacleDiagnostics(obstacleTestBar, absIndex);
+    };
+
+    window.__tapeAndLadder.rebaseObstacleTestScenario = function(){
+      if (phase !== "running" || !obstacleTestBar) return null;
+      var beforeRel = bars.indexOf(obstacleTestBar);
+      if (beforeRel < 0) return null;
+      var beforeIndex = barsBaseIndex + beforeRel;
+      var before = obstacleDiagnostics(obstacleTestBar, beforeIndex);
+      var camBefore = cam;
+      cam += REBASE_SHIFT_PX;
+      player.x += REBASE_SHIFT_PX;
+      barsBaseIndex += REBASE_BAR_SHIFT;
+      barsGenIndex += REBASE_BAR_SHIFT;
+      lastObstacleAbsI += REBASE_BAR_SHIFT;
+      barsClassifiedUpTo += REBASE_BAR_SHIFT;
+      nextHazardX += REBASE_SHIFT_PX;
+      var translatedIndex = barsBaseIndex + bars.indexOf(obstacleTestBar);
+      var translated = obstacleDiagnostics(obstacleTestBar, translatedIndex);
+      maybeRebaseWorld();
+      var afterIndex = barsBaseIndex + bars.indexOf(obstacleTestBar);
+      var after = obstacleDiagnostics(obstacleTestBar, afterIndex);
+      return {
+        shiftPx:REBASE_SHIFT_PX,
+        camBefore:camBefore, camAfter:cam,
+        before:before, after:after,
+        translatedScreenX:translated.priceGeometry.worldX-(camBefore+REBASE_SHIFT_PX),
+        beforeScreenX:before.priceGeometry.worldX-camBefore,
+        afterScreenX:after.priceGeometry.worldX-cam
       };
     };
   }

@@ -1,19 +1,20 @@
 # Tape & Ladder
 
-A small arcade game for people who read charts: the tape runs automatically, you jump marked
-candles and manage leverage, and your highest P&L becomes your score.
+A small arcade game for people who read charts: the tape runs automatically, you jump amber risk
+gates, read synthetic candles, manage leverage, and try to set a high-water P&L score.
 
 Click **Start run** or press **Space**. Start at 1× while learning the rhythm. The course stays
 hidden and stationary until you start. A new run resets the course and difficulty.
 
-- **Chart:** synthetic OHLC candles, price scale, and current-price guide. Hollow green candles
-  close higher; filled red candles close lower. Corresponding candles and runway objects share
-  the same horizontal position.
-- **Runway:** amber brackets mark candle obstacles. Jump those bodies; wicks are harmless.
-  Small candles affect P&L as you pass, even in the air. The bottom histogram shows candle body
+- **Price playfield:** synthetic OHLC candles, support/resistance, price scale, and current-price
+  guide share one fixed price-to-height mapping. Hollow green candles close higher; filled red
+  candles close lower. Candle bodies and wicks are market context, not collision shapes.
+- **Jump gates:** a small amber marker and dashed connector associate a risk candle with its
+  ground-level gate; only the closed amber outline is collision geometry. Jump that gate. Small
+  candles can still affect P&L as you pass, even in the air. The bottom histogram is candle body
   magnitude (price movement), not traded volume.
 - **Support and resistance:** each horizontal rail is anchored to the synthetic price printed in
-  its label, so display autoscaling cannot move its gameplay height. Support is a one-way chart
+  its label on that same fixed scale. Support is a one-way chart
   surface: land from above, jump again while standing on it, or run off and fall to the runway.
   Approaching from below never pulls the player upward.
 - **Depth & leverage:** separate bid-size, price, and ask-size columns. The highlighted rung sets

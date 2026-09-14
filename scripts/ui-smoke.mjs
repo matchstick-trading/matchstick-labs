@@ -32,6 +32,13 @@ async function installSupportScenario(page, mode = "land") {
   return scenario;
 }
 
+async function installObstacleScenario(page, mode = "stability") {
+  const scenario = await page.evaluate((requestedMode) =>
+    window.__tapeAndLadder.setObstacleTestScenario(requestedMode), mode);
+  assert.ok(scenario, "Obstacle test scenario was not installed");
+  return scenario;
+}
+
 async function selectStartingRung(page, targetIdx) {
   let idx = (await state(page)).ladderIdx;
   while (idx !== targetIdx) {
@@ -76,6 +83,8 @@ const cases = [
     assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.setSupportTestScenario), "undefined");
     assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.setDisplayRangeForTest), "undefined");
     assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.rebaseSupportTestScenario), "undefined");
+    assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.setObstacleTestScenario), "undefined");
+    assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.rebaseObstacleTestScenario), "undefined");
     assert.equal(await page.locator("#pauseBtn").isDisabled(), true);
     await page.waitForTimeout(250);
     assertFrozen(before, await state(page), "Setup must stay still while instructions are read");
@@ -189,30 +198,18 @@ const cases = [
     await assertSupportLanding(page);
   }],
 
-  ["support price stays fixed across display autoscale and camera windows", async (page, url) => {
+  ["support price stays fixed across camera windows", async (page, url) => {
     await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
     await waitForHarness(page);
     await start(page);
     const scenario = await installSupportScenario(page, "stability");
     assert.equal(scenario.label, `SUPPORT @ ${scenario.displayPrice} · LANDABLE`);
 
-    const autoscale = await page.evaluate(() => {
-      const before = window.__tapeAndLadder.getState();
-      const changed = window.__tapeAndLadder.setDisplayRangeForTest(-2, 3);
-      const after = window.__tapeAndLadder.getState();
-      return { before, changed, after };
-    });
-    assert.deepEqual(autoscale.changed, { low: -2, high: 3 });
-    const beforeWall = autoscale.before.upcomingHazards.find((hazard) => hazard.role === "support");
-    const scaledWall = autoscale.after.upcomingHazards.find((hazard) => hazard.role === "support");
-    assert.ok(beforeWall && scaledWall);
-    assert.equal(scaledWall.priceNorm, beforeWall.priceNorm);
-    assert.equal(scaledWall.displayPrice, beforeWall.displayPrice);
-    assert.equal(scaledWall.gameplayY, beforeWall.gameplayY);
-    assert.equal(scaledWall.label, beforeWall.label);
-
-    const startI = autoscale.after.chartWindow.startI;
-    const camBefore = autoscale.after.cam;
+    const before = await state(page);
+    const beforeWall = before.upcomingHazards.find((hazard) => hazard.role === "support");
+    assert.ok(beforeWall);
+    const startI = before.chartWindow.startI;
+    const camBefore = before.cam;
     await page.waitForFunction((previousStart) => {
       const current = window.__tapeAndLadder.getState();
       return current.chartWindow.startI > previousStart;
@@ -248,6 +245,78 @@ const cases = [
     assert.equal(after.standingSurface.priceNorm, scenario.priceNorm);
     assert.equal(after.standingSurface.displayPrice, scenario.displayPrice);
     assert.equal(after.standingSurface.gameplayY, scenario.y);
+  }],
+
+  ["candle price and amber gate geometry share fixed diagnostics", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-geometry=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await selectStartingRung(page, 8);
+    await start(page);
+    const scenario = await installObstacleScenario(page, "stability");
+    const initial = await state(page);
+    const axisTop = initial.priceAxis.find((tick) => tick.norm === 1);
+    const axisBottom = initial.priceAxis.find((tick) => tick.norm === 0);
+    assert.ok(axisTop && axisBottom);
+    const priceHeight = axisBottom.y - axisTop.y;
+    assert.equal(scenario.ohlc.open, 0.56);
+    assert.equal(scenario.ohlc.close, 0.48);
+    assert.equal(scenario.priceGeometry.bodyTopY, initial.baselineY - 0.56 * priceHeight);
+    assert.equal(scenario.priceGeometry.bodyBottomY, initial.baselineY - 0.48 * priceHeight);
+    assert.equal(scenario.priceGeometry.wickTopY, initial.baselineY - 0.60 * priceHeight);
+    assert.equal(scenario.priceGeometry.wickBottomY, initial.baselineY - 0.44 * priceHeight);
+    assert.equal(scenario.collisionGeometry.xStart, scenario.worldX + 3);
+    assert.equal(scenario.collisionGeometry.xEnd, scenario.worldX + 21);
+    assert.equal(scenario.collisionGeometry.topY, initial.baselineY - scenario.hurdlePx + 6);
+    assert.equal(scenario.collisionGeometry.bottomY, initial.baselineY);
+    assert.ok(scenario.priceGeometry.bodyBottomY < scenario.collisionGeometry.topY,
+      "Synthetic candle body must remain distinct from the arcade collision gate");
+
+    const startI = initial.chartWindow.startI;
+    await page.waitForFunction((previousStart) =>
+      window.__tapeAndLadder.getState().chartWindow.startI > previousStart, startI);
+    const advanced = await state(page);
+    const advancedObstacle = advanced.upcomingObstacles.find((obstacle) => obstacle.worldX === scenario.worldX);
+    assert.ok(advancedObstacle, "Stability fixture must remain ahead across a chart-window shift");
+    assert.deepEqual(advancedObstacle.ohlc, scenario.ohlc);
+    assert.deepEqual(advancedObstacle.priceGeometry, scenario.priceGeometry);
+    assert.deepEqual(advancedObstacle.collisionGeometry, scenario.collisionGeometry);
+
+    const rebased = await page.evaluate(() => window.__tapeAndLadder.rebaseObstacleTestScenario());
+    assert.ok(rebased && rebased.shiftPx > 100000);
+    assert.ok(Math.abs(rebased.camAfter - rebased.camBefore) < 1e-9);
+    assert.deepEqual(rebased.after.ohlc, rebased.before.ohlc);
+    assert.equal(rebased.after.hurdlePx, rebased.before.hurdlePx);
+    for (const key of ["bodyTopY", "bodyBottomY", "wickTopY", "wickBottomY"]) {
+      assert.equal(rebased.after.priceGeometry[key], rebased.before.priceGeometry[key]);
+    }
+    for (const key of ["topY", "bottomY"]) {
+      assert.equal(rebased.after.collisionGeometry[key], rebased.before.collisionGeometry[key]);
+    }
+    assert.ok(Math.abs(rebased.afterScreenX - rebased.beforeScreenX) < 1e-9);
+    assert.ok(Math.abs(rebased.translatedScreenX - rebased.beforeScreenX) < 1e-9);
+  }],
+
+  ["amber gate preserves 1x candle hit scoring", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-geometry=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await selectStartingRung(page, 8);
+    await start(page);
+    const before = (await state(page)).pnlTicks;
+    await installObstacleScenario(page, "hit");
+    await page.waitForFunction((pnl) => window.__tapeAndLadder.getState().pnlTicks === pnl - 3, before);
+    assert.equal((await state(page)).pnlTicks, before - 3);
+  }],
+
+  ["amber gate preserves 1x candle clear scoring", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-geometry=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await selectStartingRung(page, 8);
+    await start(page);
+    const before = (await state(page)).pnlTicks;
+    await installObstacleScenario(page, "clear");
+    await page.keyboard.press("Space");
+    await page.waitForFunction((pnl) => window.__tapeAndLadder.getState().pnlTicks === pnl + 2, before);
+    assert.equal((await state(page)).pnlTicks, before + 2);
   }],
 
   ["support never pulls an upward-moving player from below", async (page, url) => {
