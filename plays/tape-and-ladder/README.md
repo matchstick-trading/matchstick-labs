@@ -12,9 +12,10 @@ hidden and stationary until you start. A new run resets the course and difficult
 - **Runway:** amber brackets mark candle obstacles. Jump those bodies; wicks are harmless.
   Small candles affect P&L as you pass, even in the air. The bottom histogram shows candle body
   magnitude (price movement), not traded volume.
-- **Support:** horizontal support rails are one-way chart surfaces. Land on them from above, jump
-  again while standing on them, or run off the end and fall back to the runway. Approaching from
-  below never pulls the player upward.
+- **Support and resistance:** each horizontal rail is anchored to the synthetic price printed in
+  its label, so display autoscaling cannot move its gameplay height. Support is a one-way chart
+  surface: land from above, jump again while standing on it, or run off and fall to the runway.
+  Approaching from below never pulls the player upward.
 - **Depth & leverage:** separate bid-size, price, and ask-size columns. The highlighted rung sets
   leverage from 1× to 8×. Above entry is long; below entry is short. Crossing entry changes side.
   This is an arcade control mapping, not an order-entry simulator.

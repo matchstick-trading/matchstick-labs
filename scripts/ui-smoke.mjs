@@ -73,6 +73,9 @@ const cases = [
     const before = await state(page);
     assert.equal(before.phase, "setup");
     assert.equal(before.cam, 0);
+    assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.setSupportTestScenario), "undefined");
+    assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.setDisplayRangeForTest), "undefined");
+    assert.equal(await page.evaluate(() => typeof window.__tapeAndLadder.rebaseSupportTestScenario), "undefined");
     assert.equal(await page.locator("#pauseBtn").isDisabled(), true);
     await page.waitForTimeout(250);
     assertFrozen(before, await state(page), "Setup must stay still while instructions are read");
@@ -184,6 +187,67 @@ const cases = [
     await waitForHarness(page);
     await start(page);
     await assertSupportLanding(page);
+  }],
+
+  ["support price stays fixed across display autoscale and camera windows", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await start(page);
+    const scenario = await installSupportScenario(page, "stability");
+    assert.equal(scenario.label, `SUPPORT @ ${scenario.displayPrice} · LANDABLE`);
+
+    const autoscale = await page.evaluate(() => {
+      const before = window.__tapeAndLadder.getState();
+      const changed = window.__tapeAndLadder.setDisplayRangeForTest(-2, 3);
+      const after = window.__tapeAndLadder.getState();
+      return { before, changed, after };
+    });
+    assert.deepEqual(autoscale.changed, { low: -2, high: 3 });
+    const beforeWall = autoscale.before.upcomingHazards.find((hazard) => hazard.role === "support");
+    const scaledWall = autoscale.after.upcomingHazards.find((hazard) => hazard.role === "support");
+    assert.ok(beforeWall && scaledWall);
+    assert.equal(scaledWall.priceNorm, beforeWall.priceNorm);
+    assert.equal(scaledWall.displayPrice, beforeWall.displayPrice);
+    assert.equal(scaledWall.gameplayY, beforeWall.gameplayY);
+    assert.equal(scaledWall.label, beforeWall.label);
+
+    const startI = autoscale.after.chartWindow.startI;
+    const camBefore = autoscale.after.cam;
+    await page.waitForFunction((previousStart) => {
+      const current = window.__tapeAndLadder.getState();
+      return current.chartWindow.startI > previousStart;
+    }, startI);
+    const advanced = await state(page);
+    const advancedWall = advanced.upcomingHazards.find((hazard) => hazard.role === "support");
+    assert.ok(advanced.cam > camBefore);
+    assert.ok(advancedWall, "Long stability fixture must remain ahead across a chart-window shift");
+    assert.equal(advancedWall.priceNorm, scenario.priceNorm);
+    assert.equal(advancedWall.displayPrice, scenario.displayPrice);
+    assert.equal(advancedWall.gameplayY, scenario.y);
+    assert.equal(advancedWall.label, scenario.label);
+  }],
+
+  ["support price and attachment survive world rebasing", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await start(page);
+    const scenario = await installSupportScenario(page, "land");
+    await page.waitForFunction(() => window.__tapeAndLadder.getState().standingSurface?.type === "support");
+    const rebased = await page.evaluate(() => window.__tapeAndLadder.rebaseSupportTestScenario());
+    assert.ok(rebased && rebased.shiftPx > 100000);
+    assert.ok(Math.abs(rebased.camAfter - rebased.camBefore) < 1e-9);
+    assert.equal(rebased.standingSurfacePreserved, true);
+    assert.equal(rebased.after.priceNorm, rebased.before.priceNorm);
+    assert.equal(rebased.after.displayPrice, rebased.before.displayPrice);
+    assert.equal(rebased.after.gameplayY, rebased.before.gameplayY);
+    assert.ok(Math.abs(rebased.after.xStart - rebased.before.xStart) < 1e-9);
+    assert.ok(Math.abs(rebased.after.xEnd - rebased.before.xEnd) < 1e-9);
+    assert.ok(Math.abs(rebased.after.screenX - rebased.before.screenX) < 1e-9);
+    assert.ok(Math.abs(rebased.translatedScreenX - rebased.before.screenX) < 1e-9);
+    const after = await state(page);
+    assert.equal(after.standingSurface.priceNorm, scenario.priceNorm);
+    assert.equal(after.standingSurface.displayPrice, scenario.displayPrice);
+    assert.equal(after.standingSurface.gameplayY, scenario.y);
   }],
 
   ["support never pulls an upward-moving player from below", async (page, url) => {

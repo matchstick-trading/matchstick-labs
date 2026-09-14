@@ -588,6 +588,11 @@
   var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;             // resistance (ceiling) only
   var WALL_SUPPORT_MIN_WIDTH_PX = 80, WALL_SUPPORT_MAX_WIDTH_PX = 110; // landable support rail
   var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
+  // Gate B: walls carry price, not a separately mutable canvas Y. The normalized
+  // gameplay-price range spans a fixed 230 logical pixels above the runway. This
+  // is deliberately independent of PRICE_LANE_* and its rolling display autoscale:
+  // changing the visible candle window must never move a surface under the player.
+  var GAMEPLAY_PRICE_HEIGHT_PX = 230;
 
   // M5b hazard 2: moving-average tunnel. Not direction-conditional (unlike every
   // other hazard/candle) — a precision/restraint test, not a reflex-jump one, per
@@ -1043,13 +1048,13 @@
     // Small jitter around each role's clearance/hurdle height, same spirit as
     // Gann's randomized pivotY — kept inside the margin the physics comment above
     // sized the constants for for (tap jump vs. held jump / stand vs. jump-over).
-    var beamY = role === "resistance"
+    var targetY = role === "resistance"
       ? baselineY() - (WALL_RESISTANCE_CLEARANCE_PX + (rand()*20-10))
       : baselineY() - (WALL_SUPPORT_RAIL_HEIGHT_PX + (rand()*20-10));
     var hazard = {
       type: "wall", role: role,
       xStart: xStart, xEnd: xStart + widthPx,
-      beamY: beamY, hostile: false, hitApplied: false
+      priceNorm: gameplayYToPriceNorm(targetY), hostile: false, hitApplied: false
     };
     classifyWallHostility(hazard);
     hazards.push(hazard);
@@ -1060,10 +1065,21 @@
   }
 
   // One canonical geometry object feeds support landing, wall collision, drawing,
-  // and diagnostics. It deliberately uses the wall's spawn-time beamY rather than
-  // mapPriceY(), whose visible-window autoscale is display-only and can move.
+  // and diagnostics. `priceNorm` is the sole vertical authority; mapPriceY() is a
+  // separate display-only autoscale and never participates in wall geometry.
   function wallGeometry(hazard){
-    return { xStart:hazard.xStart, xEnd:hazard.xEnd, y:hazard.beamY };
+    var priceNorm = clamp(hazard.priceNorm, 0, 1);
+    return {
+      xStart:hazard.xStart, xEnd:hazard.xEnd,
+      priceNorm:priceNorm,
+      displayPrice:displayPrice(priceNorm),
+      y:priceToGameplayY(priceNorm)
+    };
+  }
+
+  function wallLabel(hazard, geometry){
+    var role = hazard.role === "resistance" ? "RESISTANCE" : "SUPPORT";
+    return role + " @ " + geometry.displayPrice + (hazard.role === "support" ? " · LANDABLE" : "");
   }
 
   // ------------------------------------------------------------ HAZARDS (M5b #2)
@@ -1413,6 +1429,17 @@
   // whole runway up by VOL_PANE_H and nothing else needs touching.
   function baselineY(){ return tSurf.h - BASE_MARGIN - VOL_PANE_H; }
 
+  // Stable gameplay price-space, high price at the top. This fixed logical-canvas
+  // transform is the inverse pair used when a wall is spawned and whenever its
+  // current render/collision geometry is requested. It does not read chartLow,
+  // chartHigh, camera position, or world X, so those systems cannot move a price.
+  function priceToGameplayY(norm){
+    return baselineY() - clamp(norm, 0, 1)*GAMEPLAY_PRICE_HEIGHT_PX;
+  }
+  function gameplayYToPriceNorm(y){
+    return clamp((baselineY() - y)/GAMEPLAY_PRICE_HEIGHT_PX, 0, 1);
+  }
+
   // M5.75: maps a bar's normalized [0,1] price level (open/close/wickHi/wickLo — see
   // genNextBar()) to a Y position inside the fixed PRICE_LANE_* band, high price at
   // the top like every real price pane. Unlike the runway (which only ever shows a
@@ -1737,7 +1764,7 @@
   // Ceiling test for resistance (hostile in LONG) / underside test for support
   // (hostile in SHORT) — one collidable band per wall, not five lines like the fan.
   // Resistance: hostile means "stay under this line" — hit when the player's top
-  // edge has risen at/above beamY (forgiveness matches candles' HIT_INSET_TOP,
+  // edge has risen at/above the derived price line (forgiveness matches candles' HIT_INSET_TOP,
   // shrinking the ceiling's hit region so a near-clear still reads as cleared).
   // Support: landing exactly on its visible top is safe. A hostile support hit is
   // only the contradictory case where the player's body remains below/through the
@@ -1952,7 +1979,7 @@
     ctx.globalAlpha = 1;
     ctx.fillStyle = hz.hostile ? "#ff6b5c" : "#7fa38c";
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    var label = hz.role === "resistance" ? "RESISTANCE" : "SUPPORT · LANDABLE";
+    var label = wallLabel(hz, geometry);
     ctx.fillText(label, x0+6, hz.role === "resistance" ? y-6 : y+14);
   }
 
@@ -2658,7 +2685,12 @@
         var wall = hz.type === "wall" ? wallGeometry(hz) : null;
         upcomingHazards.push({
           type: hz.type, xStart: hz.xStart, xEnd: hz.xEnd,
-          role: hz.role || null, beamY: wall ? wall.y : null, hostile: typeof hz.hostile === "boolean" ? hz.hostile : null
+          role: hz.role || null,
+          priceNorm: wall ? wall.priceNorm : null,
+          displayPrice: wall ? wall.displayPrice : null,
+          gameplayY: wall ? wall.y : null,
+          label: wall ? wallLabel(hz, wall) : null,
+          hostile: typeof hz.hostile === "boolean" ? hz.hostile : null
         });
       }
       var surface = player && player.standingSurface ? wallGeometry(player.standingSurface) : null;
@@ -2679,7 +2711,15 @@
         playerHeight: PLAYER_H,
         onGround: player ? player.onGround : null,
         baselineY: baselineY(),
-        standingSurface: surface ? { type:"support", xStart:surface.xStart, xEnd:surface.xEnd, y:surface.y } : null,
+        chartWindow: {
+          startI:chartWindowStartI, endI:chartWindowEndI,
+          low:chartLow, high:chartHigh
+        },
+        standingSurface: surface ? {
+          type:"support", xStart:surface.xStart, xEnd:surface.xEnd,
+          priceNorm:surface.priceNorm, displayPrice:surface.displayPrice,
+          gameplayY:surface.y, y:surface.y
+        } : null,
         ladderIdx: ladderPlayer.idx,
         deathCause: phase === "gameover" ? lastHitSource : null,
         upcomingObstacles: upcomingObstacles,
@@ -2694,13 +2734,15 @@
     window.__tapeAndLadder.setSupportTestScenario = function(mode){
       if (phase !== "running") return null;
       var y = baselineY() - 36;
+      var priceNorm = gameplayYToPriceNorm(y);
       var support = {
-        type:"wall", role:"support", xStart:player.x-12, xEnd:player.x+170,
-        beamY:y, hostile:false, hitApplied:false
+        type:"wall", role:"support", xStart:player.x-12,
+        xEnd:player.x+(mode === "stability" ? 800 : 170),
+        priceNorm:priceNorm, hostile:false, hitApplied:false
       };
       classifyWallHostility(support);
       hazards = [support];
-      if (mode === "clearance"){
+      if (mode === "clearance" || mode === "stability"){
         player.y = baselineY() - PLAYER_H;
         player.vy = 0;
         player.onGround = true;
@@ -2717,8 +2759,63 @@
       var geometry = wallGeometry(support);
       return {
         xStart:geometry.xStart, xEnd:geometry.xEnd, y:geometry.y,
+        priceNorm:geometry.priceNorm, displayPrice:geometry.displayPrice,
+        label:wallLabel(support, geometry),
         landingY:geometry.y-PLAYER_H, playerHeight:PLAYER_H,
         hostile:support.hostile
+      };
+    };
+
+    // Display autoscale is intentionally mutable only in this explicit test mode,
+    // allowing the smoke suite to prove that wall geometry does not read it.
+    window.__tapeAndLadder.setDisplayRangeForTest = function(low, high){
+      if (phase !== "running" || !(high > low)) return null;
+      chartLow = low; chartHigh = high;
+      return { low:chartLow, high:chartHigh };
+    };
+
+    // Round-trip the deterministic support-only world through the production M2
+    // rebase path. All world-X/index coordinates are translated together first;
+    // maybeRebaseWorld() then removes that exact shift. Price and Y are never
+    // touched, and a standingSurface remains the same hazard object reference.
+    window.__tapeAndLadder.rebaseSupportTestScenario = function(){
+      if (phase !== "running") return null;
+      var support = null;
+      for (var h=0;h<hazards.length;h++){
+        if (hazards[h].type === "wall" && hazards[h].role === "support"){
+          support = hazards[h]; break;
+        }
+      }
+      if (!support) return null;
+      var before = wallGeometry(support);
+      var camBefore = cam;
+      cam += REBASE_SHIFT_PX;
+      player.x += REBASE_SHIFT_PX;
+      barsBaseIndex += REBASE_BAR_SHIFT;
+      barsGenIndex += REBASE_BAR_SHIFT;
+      lastObstacleAbsI += REBASE_BAR_SHIFT;
+      barsClassifiedUpTo += REBASE_BAR_SHIFT;
+      support.xStart += REBASE_SHIFT_PX;
+      support.xEnd += REBASE_SHIFT_PX;
+      nextHazardX += REBASE_SHIFT_PX;
+      var translatedScreenX = support.xStart - cam;
+      maybeRebaseWorld();
+      var after = wallGeometry(support);
+      return {
+        shiftPx:REBASE_SHIFT_PX,
+        camBefore:camBefore, camAfter:cam,
+        translatedScreenX:translatedScreenX,
+        standingSurfacePreserved:player.standingSurface === support,
+        before:{
+          xStart:before.xStart, xEnd:before.xEnd, priceNorm:before.priceNorm,
+          displayPrice:before.displayPrice, gameplayY:before.y,
+          screenX:before.xStart-camBefore
+        },
+        after:{
+          xStart:after.xStart, xEnd:after.xEnd, priceNorm:after.priceNorm,
+          displayPrice:after.displayPrice, gameplayY:after.y,
+          screenX:after.xStart-cam
+        }
       };
     };
   }
