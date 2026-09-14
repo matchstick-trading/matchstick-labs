@@ -12,6 +12,9 @@ hidden and stationary until you start. A new run resets the course and difficult
 - **Runway:** amber brackets mark candle obstacles. Jump those bodies; wicks are harmless.
   Small candles affect P&L as you pass, even in the air. The bottom histogram shows candle body
   magnitude (price movement), not traded volume.
+- **Support:** horizontal support rails are one-way chart surfaces. Land on them from above, jump
+  again while standing on them, or run off the end and fall back to the runway. Approaching from
+  below never pulls the player upward.
 - **Depth & leverage:** separate bid-size, price, and ask-size columns. The highlighted rung sets
   leverage from 1× to 8×. Above entry is long; below entry is short. Crossing entry changes side.
   This is an arcade control mapping, not an order-entry simulator.
@@ -37,8 +40,8 @@ Touch devices have a large Jump / hold button and two ladder controls. Switching
 page pauses the game. Jump input just before landing is buffered for 110 ms. Keyboard-focused
 buttons retain native Space/Enter activation.
 
-Hold a jump to clear wider volume clusters and news gaps; stay low under hostile resistance.
-Later hazards include support beams, Gann fans, and moving-average channels. The cue below the
+Hold a jump to clear wider movement clusters and news gaps; stay low under hostile resistance.
+Land on support from above or jump it. Later hazards include Gann fans and moving-average channels. The cue below the
 chart names the next hazard and its action. Late channel reachability still needs a separate
 physics tuning pass; longer bot survival does not establish human playability.
 

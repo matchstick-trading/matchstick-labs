@@ -25,6 +25,49 @@ function assertFrozen(before, after, message) {
   }
 }
 
+async function installSupportScenario(page, mode = "land") {
+  const scenario = await page.evaluate((requestedMode) =>
+    window.__tapeAndLadder.setSupportTestScenario(requestedMode), mode);
+  assert.ok(scenario, "Support test scenario was not installed");
+  return scenario;
+}
+
+async function selectStartingRung(page, targetIdx) {
+  let idx = (await state(page)).ladderIdx;
+  while (idx !== targetIdx) {
+    await page.keyboard.press(idx < targetIdx ? "w" : "s");
+    idx += idx < targetIdx ? 1 : -1;
+  }
+}
+
+async function assertSupportLanding(page, useTouch = false) {
+  const scenario = await installSupportScenario(page);
+  await page.waitForFunction(() => window.__tapeAndLadder.getState().standingSurface?.type === "support");
+  const landed = await state(page);
+  assert.equal(landed.playerY, scenario.landingY);
+  assert.equal(landed.standingSurface.y, scenario.y);
+
+  if (useTouch) await page.locator('[data-action="jump"]').tap();
+  else await page.keyboard.press("Space");
+  await page.waitForFunction((landingY) => {
+    const current = window.__tapeAndLadder.getState();
+    return !current.onGround && current.standingSurface === null && current.playerY < landingY - 4;
+  }, scenario.landingY);
+
+  // A tap jump lands on the remaining rail, then the auto-run carries the player
+  // off its end and normal baseline gravity resumes.
+  await page.waitForFunction(() => window.__tapeAndLadder.getState().standingSurface?.type === "support");
+  await page.waitForFunction((xEnd) => {
+    const current = window.__tapeAndLadder.getState();
+    return current.playerX > xEnd && current.standingSurface === null;
+  }, scenario.xEnd);
+  await page.waitForFunction(() => {
+    const current = window.__tapeAndLadder.getState();
+    return current.onGround && current.standingSurface === null &&
+      current.playerY === current.baselineY - current.playerHeight;
+  });
+}
+
 const cases = [
   ["setup waits without advancing the world", async (page) => {
     const before = await state(page);
@@ -136,6 +179,77 @@ const cases = [
     assert.equal((await state(page)).onGround, true, "A press long before landing must not cause an automatic second jump");
   }],
 
+  ["support allows land, stand, jump, and fall to baseline", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await start(page);
+    await assertSupportLanding(page);
+  }],
+
+  ["support never pulls an upward-moving player from below", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await start(page);
+    const scenario = await installSupportScenario(page, "below");
+    const passedThrough = await page.evaluate(({ y, landingY, playerHeight }) => new Promise((resolvePass, rejectPass) => {
+      const deadline = performance.now() + 800;
+      const sample = () => {
+        const current = window.__tapeAndLadder.getState();
+        if (current.standingSurface || current.playerY === landingY) {
+          rejectPass(new Error("Support teleported the player onto the rail from below"));
+        } else if (current.playerY + playerHeight < y - 1) {
+          resolvePass(current);
+        } else if (performance.now() > deadline) {
+          rejectPass(new Error("Player did not pass upward through the one-way support"));
+        } else requestAnimationFrame(sample);
+      };
+      sample();
+    }), scenario);
+    assert.equal(passedThrough.standingSurface, null);
+    assert.ok(passedThrough.playerY < scenario.landingY);
+  }],
+
+  ["hostile SHORT support scores only on visible rail contact", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await selectStartingRung(page, 6);
+    await start(page);
+    const position = await state(page);
+    assert.equal(position.direction, "SHORT");
+    assert.equal(position.leverage, 2);
+
+    const clearance = await installSupportScenario(page, "clearance");
+    assert.equal(clearance.hostile, true);
+    const beforeClearance = (await state(page)).pnlTicks;
+    await page.waitForTimeout(120);
+    assert.equal((await state(page)).pnlTicks, beforeClearance,
+      "Visible air below support must not behave like an invisible solid column");
+
+    const contact = await installSupportScenario(page, "below");
+    assert.equal(contact.hostile, true);
+    await page.waitForFunction((before) => window.__tapeAndLadder.getState().pnlTicks === before - 6,
+      beforeClearance);
+    const afterContact = (await state(page)).pnlTicks;
+    await page.waitForTimeout(120);
+    assert.equal((await state(page)).pnlTicks, afterContact,
+      "One underside contact must not score repeatedly");
+
+    const landing = await installSupportScenario(page, "land");
+    assert.equal(landing.hostile, true);
+    await page.waitForFunction(() => window.__tapeAndLadder.getState().standingSurface?.type === "support");
+    assert.equal((await state(page)).pnlTicks, afterContact,
+      "Landing safely on top of hostile support must not score an underside hit");
+  }],
+
+  ["support lifecycle works on a 390px touch viewport", async (page, url) => {
+    await page.goto(`${url}?seed=1&test-support=1`, { waitUntil: "domcontentloaded" });
+    await waitForHarness(page);
+    await page.locator("#startBtn").tap();
+    await page.waitForFunction(() => window.__tapeAndLadder.getState().phase === "running");
+    assert.equal(await page.locator("#touchControls").getAttribute("aria-hidden"), "false");
+    await assertSupportLanding(page, true);
+  }, { viewport: { width: 390, height: 844 }, hasTouch: true }],
+
   ["P and Resume pause the run and suppress gameplay inputs", async (page) => {
     await start(page);
     await page.waitForFunction(() => window.__tapeAndLadder.getState().rampDistancePx > 10);
@@ -231,8 +345,12 @@ async function main() {
   let failures = 0;
   try {
     browser = await chromium.launch({ headless: true });
-    for (const [name, test] of cases) {
-      const context = await browser.newContext({ viewport: { width: 1100, height: 720 }, serviceWorkers: "block" });
+    for (const [name, test, options = {}] of cases) {
+      const context = await browser.newContext({
+        viewport: options.viewport || { width: 1100, height: 720 },
+        hasTouch: options.hasTouch || false,
+        serviceWorkers: "block",
+      });
       await context.route("**/*", (route) => {
         const request = route.request();
         return request.method() === "GET" && new URL(request.url()).origin === new URL(url).origin

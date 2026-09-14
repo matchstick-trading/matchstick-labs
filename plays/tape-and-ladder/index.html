@@ -176,7 +176,7 @@
     <div class="kbrow"><kbd>P / Esc</kbd><span>Pause or resume the run.</span></div>
     <div class="kbrow"><kbd>R</kbd><span>Start a fresh course.</span></div>
     <div class="lesson"><b>Read the marks, not just the colors.</b><br>Green candles close higher; red candles close lower. Amber brackets mark a jump obstacle. Wicks are decoration. Small candles can still change P&amp;L when you pass them, even in the air.</div>
-    <p><b>Watch what comes next.</b> Hold through a volume cluster or a news gap. Stay low under resistance; jump hostile support. Later, fans and moving-average channels add new timing challenges. The cue below the chart calls them out.</p>
+    <p><b>Watch what comes next.</b> Hold through a movement cluster or a news gap. Stay low under resistance; land on support from above or jump it. Later, fans and moving-average channels add new timing challenges. The cue below the chart calls them out.</p>
     <p><b>Your score is your highest P&amp;L.</b> Every gain and loss is multiplied by leverage. A loss from your peak uses up margin; exceed the allowance and the run ends. This is an arcade scoring rule.</p>
     <button class="close primary" id="helpClose" type="button">Got it</button>
   </div>
@@ -225,6 +225,9 @@
     return m ? (Number(m[1]) >>> 0) : (Date.now() & 0xffffffff);
   })();
   var rand = mulberry32(runSeed);
+  // Browser checks may request one deterministic support-only course. The hook is
+  // installed only for this explicit URL, never for an ordinary player session.
+  var supportTestMode = /[?&]test-support=1(?:&|$)/.test(location.search);
 
   // -------------------------------------------------------------- SOUND FX
   var SoundFX = (function(){
@@ -532,9 +535,9 @@
   // height, sometimes unavoidable) with its own fairness/timing model that M3/M5.5
   // never tuned for and would need its own playtest cycle. That fuller "obstacles
   // (and support/resistance) are lanes you jump between, not just hurdles" rework is
-  // deliberately deferred — see the M8 entry in Milestones below. This pass only
-  // makes the reference chart honest; it doesn't change what the player interacts
-  // with.
+  // deliberately deferred — see the M8 entry in Milestones below. M8 Gate A now
+  // makes support landable, but price-positioned candles and full lane navigation
+  // remain deferred; this price pane is still display-only.
   var VOL_PANE_H = 42;
   var PRICE_LANE_TOP_PX = 28, PRICE_LANE_H = 118;
   // M2 streaming terrain: bar-index space is unbounded (no more fixed N_BARS array —
@@ -576,31 +579,14 @@
   // M5b hazard 1: support/resistance wall. A resistance beam sits high (ceiling —
   // ~150px above baseline puts it above a tap jump's ~130px head apex but below a
   // full held jump's ~187px head apex, so staying low/tapping clears it and holding
-  // the jump button through it doesn't); a support beam sits low (hurdle — same
-  // 18-85px scale a candle obstacle's hurdlePx uses) and must be jumped over like an
-  // ordinary obstacle. Both widths randomize a bit like Gann's pivotY does.
-  // M10 fairness fix. The comment above says a support beam "must be jumped over
-  // like an ordinary obstacle" — at the shipped constants it could not be, ever.
-  // Clearing a support beam means keeping the player's *bottom edge* above beamY for
-  // the beam's whole width, and the widest span a jump can hold above a 60px beam is
-  // 69px (tap) / 100px (held) at SCROLL_SPEED_START, rising to 105/153px at
-  // SCROLL_SPEED_MAX. The beam was 260-420px wide. So a hostile support wall was a
-  // guaranteed, unavoidable -3 every time one spawned — roughly a quarter of all
-  // walls (50% support x 50% of runs in the direction that makes support hostile).
-  // Fix, in two parts: (1) width is now role-dependent, since only the support role
-  // has to be crossed airborne — a resistance beam is a ceiling, where width only
-  // decides how long you must stay low, which is always possible, so it keeps the
-  // original wide span; (2) the support hurdle drops to 30px, still inside the same
-  // 18-85px scale a candle obstacle's hurdlePx uses, just at the forgiving end.
-  // At 30px the jump holds above the beam for 86px (tap) / 113px (held) at the
-  // slowest scroll speed, so the 80-110px support band is clearable at every speed
-  // the ramp produces — but only the very narrowest beams are tap-clearable; most of
-  // the band needs a held jump. Kept deliberately tight against that envelope rather
-  // than made comfortably narrow: a support beam should still cost a player who
-  // reaches for it with a reflex tap instead of committing to the hold.
-  var WALL_RESISTANCE_CLEARANCE_PX = 150, WALL_SUPPORT_HURDLE_PX = 30;
+  // the jump button through it doesn't); a support beam sits low, inside the same
+  // vertical band previously used for its hurdle geometry. M8 Gate A makes support
+  // a one-way rail: jump through it from below, land on its visible top while
+  // descending, then jump again or run off the end. Widths still use M10's shorter
+  // support band so the rail remains reachable within the current jump envelope.
+  var WALL_RESISTANCE_CLEARANCE_PX = 150, WALL_SUPPORT_RAIL_HEIGHT_PX = 30;
   var WALL_MIN_WIDTH_PX = 260, WALL_MAX_WIDTH_PX = 420;             // resistance (ceiling) only
-  var WALL_SUPPORT_MIN_WIDTH_PX = 80, WALL_SUPPORT_MAX_WIDTH_PX = 110; // support (hurdle) only
+  var WALL_SUPPORT_MIN_WIDTH_PX = 80, WALL_SUPPORT_MAX_WIDTH_PX = 110; // landable support rail
   var WALL_HIT_THICKNESS_PX = 6; // reuses HIT_INSET_TOP-style forgiveness, see testWallCollision()
 
   // M5b hazard 2: moving-average tunnel. Not direction-conditional (unlike every
@@ -737,7 +723,7 @@
   // at once from frame one. Order runs easiest/most candle-like first: volSpikes is
   // explicitly "mechanically identical to a candle" per its M5b design (see that
   // hazard's own comment), so it costs nothing new to introduce early; wall
-  // (support/resistance) is a single binary hurdle/ceiling and the most direct tie
+  // (support/resistance) is a single surface/ceiling and the most direct tie
   // to the trader feedback that prompted M5.75/M8; gannFan asks the player to track
   // a diagonal line instead of a horizontal one; tunnel and gap are held for last —
   // sustained-precision and stop-dead-and-time-it are the two most punishing/least
@@ -1044,8 +1030,8 @@
   // hazard/candle uses). Market-metaphor mapping: resistance is a ceiling price
   // struggles to break above, so in LONG (price wants to go up) it's the wall in
   // your way — hostile; support is a floor price struggles to break below, so it's
-  // in your way for SHORT (price wants to go down). Both are harmless/walkable for
-  // the opposite direction, per the ticket.
+  // in your way for SHORT (price wants to go down). Hostility controls scoring;
+  // support's visible top remains physically landable in either direction.
   function spawnWall(xStart){
     var role = rand() < 0.5 ? "resistance" : "support";
     // M10: role-dependent width — see the WALL_SUPPORT_*_WIDTH_PX comment for why a
@@ -1059,7 +1045,7 @@
     // sized the constants for for (tap jump vs. held jump / stand vs. jump-over).
     var beamY = role === "resistance"
       ? baselineY() - (WALL_RESISTANCE_CLEARANCE_PX + (rand()*20-10))
-      : baselineY() - (WALL_SUPPORT_HURDLE_PX + (rand()*20-10));
+      : baselineY() - (WALL_SUPPORT_RAIL_HEIGHT_PX + (rand()*20-10));
     var hazard = {
       type: "wall", role: role,
       xStart: xStart, xEnd: xStart + widthPx,
@@ -1071,6 +1057,13 @@
 
   function classifyWallHostility(hazard){
     hazard.hostile = (hazard.role === "resistance") ? (direction === "LONG") : (direction === "SHORT");
+  }
+
+  // One canonical geometry object feeds support landing, wall collision, drawing,
+  // and diagnostics. It deliberately uses the wall's spawn-time beamY rather than
+  // mapPriceY(), whose visible-window autoscale is display-only and can move.
+  function wallGeometry(hazard){
+    return { xStart:hazard.xStart, xEnd:hazard.xEnd, y:hazard.beamY };
   }
 
   // ------------------------------------------------------------ HAZARDS (M5b #2)
@@ -1445,7 +1438,7 @@
   // Only the per-round *vertical* physics state resets; see resetTerrainPlayerVerticals().
   function initTerrainPlayer(){
     cam = 0;
-    player = { x: tSurf.w/3, y: baselineY()-PLAYER_H, vx:scrollSpeed, vy:0, onGround:true };
+    player = { x: tSurf.w/3, y: baselineY()-PLAYER_H, vx:scrollSpeed, vy:0, onGround:true, standingSurface:null };
   }
 
   // Per-round reset: grounds the player and clears jump/vertical state only. Does
@@ -1455,7 +1448,25 @@
     player.y = baselineY()-PLAYER_H;
     player.vy = 0;
     player.onGround = true;
+    player.standingSurface = null;
     jumpHoldMs = 0;
+  }
+
+  // A support is a one-way surface: descending feet may land on its visible top,
+  // but a player whose feet were already below it can pass upward without being
+  // teleported. Equality keeps a grounded player attached until their body clears
+  // the rail's horizontal extent.
+  function landableSupportAt(previousBottom, nextBottom){
+    if (player.vy < 0) return null;
+    var px0 = player.x - PLAYER_W/2, px1 = player.x + PLAYER_W/2;
+    for (var i=0;i<hazards.length;i++){
+      var hz = hazards[i];
+      if (hz.type !== "wall" || hz.role !== "support") continue;
+      var geometry = wallGeometry(hz);
+      if (px1 <= geometry.xStart || px0 >= geometry.xEnd) continue;
+      if (previousBottom <= geometry.y && nextBottom >= geometry.y) return hz;
+    }
+    return null;
   }
 
   // M5b #3: is any live (not yet fallResolved — see updateTerrain()'s ground
@@ -1475,12 +1486,14 @@
 
   function updateTerrain(dt){
     var wasOnGround = player.onGround;
+    var previousBottom = player.y + PLAYER_H;
 
     if (jumpQueued) jumpBufferMs = JUMP_BUFFER_MS;
     jumpQueued = false;
     if (jumpBufferMs > 0 && player.onGround){
       player.vy = JUMP_V;
       player.onGround = false;
+      player.standingSurface = null;
       jumpHoldMs = 0; jumpBufferMs = 0;
       SoundFX.jump();
     } else jumpBufferMs = Math.max(0, jumpBufferMs - dt*1000);
@@ -1519,6 +1532,7 @@
     player.y += player.vy*dt;
 
     var baseline = baselineY();
+    var supportHere = landableSupportAt(previousBottom, player.y + PLAYER_H);
     // M5b #3: the gap's physics exception. Every other hazard is a hit test
     // layered on top of unmodified ground physics; the gap instead makes ground
     // presence itself x-dependent — while the player's body is over a live gap,
@@ -1533,7 +1547,15 @@
     // before that depth is ever reached (clean landing, ground check resumes
     // normally on the far ledge).
     var gapHere = activeGapAt();
-    if (gapHere){
+    if (supportHere){
+      var supportGeometry = wallGeometry(supportHere);
+      player.y = supportGeometry.y - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      player.standingSurface = supportHere;
+      if (!wasOnGround) SoundFX.land();
+    } else if (gapHere){
+      player.standingSurface = null;
       if (player.y + PLAYER_H >= baseline + GAP_FALL_DEPTH_PX){
         // Fell in: never had enough horizontal carry to clear it. One-time
         // penalty via the same applyPnlDelta() pathway every other hazard uses
@@ -1557,9 +1579,11 @@
       player.y = baseline - PLAYER_H;
       player.vy = 0;
       player.onGround = true;
+      player.standingSurface = null;
       if (!wasOnGround) SoundFX.land();
     } else {
       player.onGround = false;
+      player.standingSurface = null;
     }
 
     // M2/M3 streaming terrain: rebase first (so generation/classification/dropping
@@ -1710,22 +1734,31 @@
     return null;
   }
 
-  // Ceiling test for resistance (hostile in LONG) / hurdle test for support
+  // Ceiling test for resistance (hostile in LONG) / underside test for support
   // (hostile in SHORT) — one collidable band per wall, not five lines like the fan.
   // Resistance: hostile means "stay under this line" — hit when the player's top
   // edge has risen at/above beamY (forgiveness matches candles' HIT_INSET_TOP,
   // shrinking the ceiling's hit region so a near-clear still reads as cleared).
-  // Support: hostile means "jump over this line" — same AABB hurdle shape
-  // playerObstacleOverlap() uses for a candle obstacle, just keyed to beamY
-  // instead of `baseline - b.hurdlePx` (a wall spans an arbitrary px range, not one
-  // COLW column, so it can't reuse that function directly).
+  // Support: landing exactly on its visible top is safe. A hostile support hit is
+  // only the contradictory case where the player's body remains below/through the
+  // line after forgiveness, preserving the existing SHORT penalty without turning
+  // normal standing contact into a repeated hit.
   function testWallCollision(hazard, player){
     if (!hazard.hostile || hazard.hitApplied) return null;
-    if (player.x < hazard.xStart || player.x > hazard.xEnd) return null;
+    var geometry = wallGeometry(hazard);
+    var px0 = player.x - PLAYER_W/2, px1 = player.x + PLAYER_W/2;
+    if (px1 <= geometry.xStart || px0 >= geometry.xEnd) return null;
     if (hazard.role === "resistance"){
-      if (player.y < hazard.beamY - WALL_HIT_THICKNESS_PX) return hazard;
+      if (player.y < geometry.y - WALL_HIT_THICKNESS_PX) return hazard;
     } else {
-      if (player.y + PLAYER_H > hazard.beamY + WALL_HIT_THICKNESS_PX) return hazard;
+      // A grounded player below the rail has visible clearance and must not be
+      // hit by an invisible column. Only upward contact with the rendered
+      // underside scores; a descending player is approaching the safe landable
+      // top, which updateTerrain() resolves when their feet cross the rail.
+      var standingHere = player.standingSurface === hazard;
+      var intersectsRail = player.y < geometry.y + WALL_HIT_THICKNESS_PX &&
+        player.y + PLAYER_H > geometry.y - WALL_HIT_THICKNESS_PX;
+      if (!standingHere && player.vy < 0 && intersectsRail) return hazard;
     }
     return null;
   }
@@ -1905,19 +1938,21 @@
   // label so the market-metaphor reading (RESISTANCE overhead / SUPPORT underfoot)
   // is legible at a glance, not just inferable from color.
   function drawWall(ctx, cam, w, hz){
-    if (hz.xEnd < cam || hz.xStart > cam+w) return; // fully off-screen
-    var x0 = Math.max(hz.xStart, cam) - cam, x1 = Math.min(hz.xEnd, cam+w) - cam;
-    var y = hz.beamY;
+    var geometry = wallGeometry(hz);
+    if (geometry.xEnd < cam || geometry.xStart > cam+w) return; // fully off-screen
+    var x0 = Math.max(geometry.xStart, cam) - cam, x1 = Math.min(geometry.xEnd, cam+w) - cam;
+    var y = geometry.y;
     ctx.strokeStyle = hz.hostile ? "#ff6b5c" : "#6ef2a0";
     ctx.lineWidth = 2;
     ctx.globalAlpha = hz.hostile ? .9 : .4;
-    ctx.setLineDash([3,3]);
+    // Resistance remains a dashed limit; support is a continuous landable rail.
+    ctx.setLineDash(hz.role === "support" ? [] : [3,3]);
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
     ctx.fillStyle = hz.hostile ? "#ff6b5c" : "#7fa38c";
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    var label = hz.role === "resistance" ? "RESISTANCE" : "SUPPORT";
+    var label = hz.role === "resistance" ? "RESISTANCE" : "SUPPORT · LANDABLE";
     ctx.fillText(label, x0+6, hz.role === "resistance" ? y-6 : y+14);
   }
 
@@ -2169,12 +2204,12 @@
   }
 
   function hazardName(type){
-    return {candle:"Candle",volSpikes:"Volume cluster",wall:"Support / resistance",gannFan:"Gann fan",tunnel:"MA channel",gap:"News gap"}[type] || "Risk limit";
+    return {candle:"Candle",volSpikes:"Movement cluster",wall:"Support / resistance",gannFan:"Gann fan",tunnel:"MA channel",gap:"News gap"}[type] || "Risk limit";
   }
   // Shared with marginCall()'s recovery tip so the two can't drift apart —
   // one entry per hazard type in testHazardCollision()/hazardName().
   var HAZARD_RECOVERY_TIP = {
-    wall: "Watch for support/resistance and hold your jump through the line.",
+    wall: "Stay low under resistance; land on support from above or jump it.",
     volSpikes: "Hold jump longer to carry across the whole hazard.",
     gap: "Hold jump longer to carry across the whole hazard.",
     tunnel: "Stay between the amber lines through MA channels.",
@@ -2196,8 +2231,8 @@
       var x=hz.type==="gannFan"?hz.pivotX:hz.xStart;
       if (hz.xEnd<player.x || x-player.x>distance || x>cam+tSurf.w) return;
       var action;
-      if(hz.type==="wall") action=hz.hostile?(hz.role==="resistance"?"Resistance · stay low":"Support · hold jump"):"Passable "+hz.role+" · keep your rhythm";
-      else if(hz.type==="volSpikes") action="Volume cluster · one held jump";
+      if(hz.type==="wall") action=hz.role==="support"?"Support · land on top or jump":"Resistance · "+(hz.hostile?"stay low":"keep your rhythm");
+      else if(hz.type==="volSpikes") action="Movement cluster · one held jump";
       else if(hz.type==="gap") action="News gap · hold jump across the void";
       else if(hz.type==="tunnel") action="MA channel · stay between the amber lines";
       else action="Gann fan · time your jump through the lines";
@@ -2620,8 +2655,13 @@
       for (var h = 0; h < hazards.length; h++){
         var hz = hazards[h];
         if (player && hz.xEnd < player.x) continue; // already behind the player
-        upcomingHazards.push({ type: hz.type, xStart: hz.xStart, xEnd: hz.xEnd });
+        var wall = hz.type === "wall" ? wallGeometry(hz) : null;
+        upcomingHazards.push({
+          type: hz.type, xStart: hz.xStart, xEnd: hz.xEnd,
+          role: hz.role || null, beamY: wall ? wall.y : null, hostile: typeof hz.hostile === "boolean" ? hz.hostile : null
+        });
       }
+      var surface = player && player.standingSurface ? wallGeometry(player.standingSurface) : null;
       return {
         phase: phase,
         paused: paused,
@@ -2636,7 +2676,10 @@
         cam: cam,
         playerX: player ? player.x : null,
         playerY: player ? player.y : null,
+        playerHeight: PLAYER_H,
         onGround: player ? player.onGround : null,
+        baselineY: baselineY(),
+        standingSurface: surface ? { type:"support", xStart:surface.xStart, xEnd:surface.xEnd, y:surface.y } : null,
         ladderIdx: ladderPlayer.idx,
         deathCause: phase === "gameover" ? lastHitSource : null,
         upcomingObstacles: upcomingObstacles,
@@ -2644,6 +2687,41 @@
       };
     }
   };
+
+  // Narrow mutation hook for the deterministic surface lifecycle smoke check.
+  // It is unreachable unless the page was explicitly loaded with test-support=1.
+  if (supportTestMode){
+    window.__tapeAndLadder.setSupportTestScenario = function(mode){
+      if (phase !== "running") return null;
+      var y = baselineY() - 36;
+      var support = {
+        type:"wall", role:"support", xStart:player.x-12, xEnd:player.x+170,
+        beamY:y, hostile:false, hitApplied:false
+      };
+      classifyWallHostility(support);
+      hazards = [support];
+      if (mode === "clearance"){
+        player.y = baselineY() - PLAYER_H;
+        player.vy = 0;
+        player.onGround = true;
+      } else {
+        player.y = mode === "below" ? y-PLAYER_H+12 : y-PLAYER_H-8;
+        player.vy = mode === "below" ? -220 : 220;
+        player.onGround = false;
+      }
+      player.standingSurface = null;
+      jumpQueued = false; jumpBufferMs = 0; jumpHoldMs = 0; keysHeld = {};
+      for (var i=terrainIndexAt(player.x)-2;i<=terrainIndexAt(support.xEnd)+2;i++){
+        var b = barAt(i); if (b){ b.resolved = true; b.isObstacle = false; }
+      }
+      var geometry = wallGeometry(support);
+      return {
+        xStart:geometry.xStart, xEnd:geometry.xEnd, y:geometry.y,
+        landingY:geometry.y-PLAYER_H, playerHeight:PLAYER_H,
+        hostile:support.hostile
+      };
+    };
+  }
 
   // ------------------------------------------------------------------ LOOP
   newRound();
