@@ -524,6 +524,12 @@
   // Floating OHLC bodies are informational/non-collidable in this gate; making them
   // landable requires its own reachability, scoring, and platform-grouping contract.
   var VOL_PANE_H = 42;
+  // The price-move strip is decorative/non-collidable (unlike priceToGameplayY's
+  // fixed Gate C scale, which walls/gates depend on), so it's safe to auto-scale
+  // to whatever's visible — same idea as a real chart's volume pane scaling to the
+  // local max instead of some fixed constant. VOL_PANE_MIN_SCALE floors that scale
+  // so a stretch of all-flat candles doesn't blow tiny noise up to full pane height.
+  var VOL_PANE_MIN_SCALE = 0.06;
   // M2 streaming terrain: bar-index space is unbounded (no more fixed N_BARS array —
   // "no more end of the world"). GEN_AHEAD_BARS is how far past the camera's leading
   // edge stays generated; DROP_MARGIN_BARS is the small trailing buffer kept behind
@@ -2144,6 +2150,11 @@
     ctx.fillStyle = "#101c2d"; ctx.fillRect(0,0,w,h);
     var startI = Math.max(0, Math.floor(cam/COLW)-1), endI = Math.ceil((cam+w)/COLW)+1;
     chartWindowStartI = startI; chartWindowEndI = endI;
+    var volScale = VOL_PANE_MIN_SCALE;
+    for (var volI=startI; volI<=endI; volI++){
+      var volB = barAt(volI);
+      if (volB && volB.bodyMag > volScale) volScale = volB.bodyMag;
+    }
     var priceTicks = gameplayPriceTicks(), priceTop = priceTicks[0].y;
     ctx.fillStyle = "#0c1726"; ctx.fillRect(0,priceTop,w,baseline-priceTop);
     ctx.lineWidth = 1; ctx.strokeStyle = "#213047";
@@ -2194,8 +2205,11 @@
           ctx.font="10px 'IBM Plex Mono', monospace";
           ctx.fillText(b.favorable?"+":"−",sx+8,baseline-4);
         }
-        // This is candle body magnitude, not traded volume.
-        var moveH = clamp(b.bodyMag/.16*(VOL_PANE_H-8),1,VOL_PANE_H-8);
+        // This is candle body magnitude, not traded volume. Scaled to the
+        // biggest move in the visible window (volScale) instead of a fixed
+        // constant, so typical bars use real vertical range instead of
+        // bottoming out at the 1px floor.
+        var moveH = clamp(b.bodyMag/volScale*(VOL_PANE_H-8),1,VOL_PANE_H-8);
         ctx.globalAlpha=.55;ctx.fillStyle=col;
         ctx.fillRect(sx+6,h-BASE_MARGIN-moveH,12,moveH);
         ctx.globalAlpha=1;
