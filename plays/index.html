@@ -36,6 +36,29 @@
   a.play .desc { color: #9a9a9a; font-size: 0.9rem; }
   footer { margin-top: 2rem; font-size: 0.8rem; color: #6a6a6a; }
   footer a { color: #6a6a6a; }
+  h2.systems-heading {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6a6a6a;
+    font-weight: 600;
+    margin: 2rem 0 0.75rem;
+  }
+  ul.systems-list { list-style: none; padding: 0; margin: 0; }
+  ul.systems-list li { margin-bottom: 0.6rem; }
+  a.system {
+    display: block;
+    padding: 0.65rem 1.1rem;
+    border: 1px solid #2a2d33;
+    border-radius: 8px;
+    color: #e8e6e1;
+    text-decoration: none;
+    background: transparent;
+    transition: border-color 0.15s ease;
+  }
+  a.system:hover { border-color: #5b7cff; }
+  a.system .name { font-weight: 600; font-size: 0.88rem; }
+  a.system .desc { color: #9a9a9a; font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -65,6 +88,21 @@
       <a class="play" href="./market-data-incident-lab/">
         <div class="name">Market Data Incident Lab</div>
         <div class="desc">Frozen quotes, crossed books, bad splits — and a genuine news move as a trap.</div>
+      </a>
+    </li>
+  </ul>
+  <h2 class="systems-heading">Systems behind the plays</h2>
+  <ul class="systems-list">
+    <li>
+      <a class="system" href="https://jev.matchstick.trading" target="_blank" rel="noopener">
+        <div class="name">Jev Regime Screener</div>
+        <div class="desc">Standalone System One experiment — its API also powers Find the Moment, Backtest Autopsy, and Market Data Incident Lab.</div>
+      </a>
+    </li>
+    <li>
+      <a class="system" href="https://github.com/matchstick-trading/opencandle" target="_blank" rel="noopener">
+        <div class="name">OpenCandle</div>
+        <div class="desc">The open candle and metadata format used by the research.</div>
       </a>
     </li>
   </ul>

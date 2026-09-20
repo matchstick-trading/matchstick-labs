@@ -14,10 +14,12 @@ fun to play with and interesting to show.
   book as a ladder. An arcade answer to "what if browsing data felt physical instead of visual?"
 - [`find-the-moment`](plays/find-the-moment/) — describe a market episode in plain language.
   Deterministic code searches synthetic fixtures, Jev ranks the shortlist, you reveal ground truth.
-- [`backtest-autopsy`](plays/backtest-autopsy/) — 45 synthetic backtests, five with a seeded bug.
-  Deterministic code always computes cheap diagnostics; Jev triages which one check to run next.
-- [`market-data-incident-lab`](plays/market-data-incident-lab/) — 45 synthetic feed runs, five
-  with a seeded incident, five with a genuine news move as a deliberate trap for Jev's triage.
+- [`backtest-autopsy`](plays/backtest-autopsy/) — 45 synthetic backtests, 30 failing across five
+  seeded bug families, 15 clean. Deterministic code always computes cheap diagnostics; Jev triages
+  which one check to run next.
+- [`market-data-incident-lab`](plays/market-data-incident-lab/) — 45 synthetic feed runs, 30 with
+  a seeded incident across five families, 15 clean — five of those carrying a genuine news move as
+  a deliberate trap for Jev's triage.
 
 ## Why public
 
