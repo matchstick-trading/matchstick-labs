@@ -20,6 +20,8 @@ fun to play with and interesting to show.
 - [`market-data-incident-lab`](plays/market-data-incident-lab/) — 45 synthetic feed runs, 30 with
   a seeded incident across five families, 15 clean — five of those carrying a genuine news move as
   a deliberate trap for Jev's triage.
+- [`decision-boundary-lab`](plays/decision-boundary-lab/) — no corpus, no symbol. Move one regime
+  feature at a time and watch Jev's distribution shift against a fixed deterministic rule.
 
 ## Why public
 

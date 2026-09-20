@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Decision Boundary Lab — Matchstick Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --surface: #18181b; --border: #27272a; --border-light: #3f3f46;
+  --brand: #F1479F; --brand-dim: #F1479F66;
+  --text: #fafafa; --text-muted: #a1a1aa; --text-dim: #71717a;
+  --green: #34d399; --amber: #fbbf24; --red: #f87171;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); padding: 0; }
+button { font: inherit; cursor: pointer; }
+select { font: inherit; }
+a { color: var(--brand); text-decoration: none; }
+
+.app { max-width: 880px; margin: 0 auto; padding: 16px; }
+
+header { border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; }
+header h1 { font: 600 18px var(--mono); letter-spacing: -0.5px; }
+header .sub { font-size: 12px; color: var(--text-dim); }
+
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.intro strong { color: var(--text); }
+
+.presets { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 16px; }
+.preset-btn { padding: 6px 12px; border-radius: 6px; background: var(--surface);
+  border: 1px solid var(--border); color: var(--text-muted); font: 500 11px var(--mono);
+  transition: all 0.15s; }
+.preset-btn:hover { border-color: var(--brand); color: var(--brand); }
+.preset-btn:disabled { opacity: 0.4; cursor: default; }
+
+.controls { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 16px; display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .controls { grid-template-columns: 1fr 1fr; } }
+.control label { display: block; font: 600 11px var(--mono); color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.control select { width: 100%; padding: 8px 10px; border-radius: 6px; background: #27272a;
+  border: 1px solid var(--border); color: var(--text); font: 500 13px var(--mono); }
+.control select:focus { outline: none; border-color: var(--brand); }
+.control select:disabled { opacity: 0.5; }
+
+.panels { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+@media (min-width: 720px) { .panels { grid-template-columns: 1fr 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.panel h3 { font: 600 12px var(--mono); color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px; }
+
+.baseline-badge { font: 700 22px var(--mono); margin-bottom: 8px; }
+.baseline-rule { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+.dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.dist-row .name { width: 78px; font: 500 11px var(--mono); color: var(--text-muted); flex-shrink: 0; }
+.dist-row .bar { flex: 1; height: 16px; background: #27272a; border-radius: 3px; overflow: hidden; }
+.dist-row .bar-fill { height: 100%; transition: width 0.4s ease-out; }
+.dist-row .pct { width: 38px; text-align: right; font: 500 11px var(--mono); color: var(--text-dim); flex-shrink: 0; }
+.dist-row.top .name, .dist-row.top .pct { color: var(--text); }
+
+.gauges { display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gauge { flex: 1; }
+.gauge .label { font: 500 10px var(--mono); color: var(--text-dim); margin-bottom: 4px; }
+.gauge .val { font: 600 15px var(--mono); }
+
+.match-tag { display: inline-block; padding: 3px 10px; border-radius: 4px; font: 600 10px var(--mono);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 10px; }
+.match-tag.agree { background: #34d39922; color: var(--green); }
+.match-tag.disagree { background: #fbbf2422; color: var(--amber); }
+
+.jev-loading, .jev-error { font: 500 12px var(--mono); color: var(--text-dim); text-align: center; padding: 20px 0; }
+.jev-error { color: var(--red); }
+
+.log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+.log h3 { font: 600 12px var(--mono); color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 10px; }
+.log-entry { font: 400 11px var(--mono); color: var(--text-muted); padding: 7px 0;
+  border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.log-entry:last-child { border-bottom: none; }
+.log-entry .change { color: var(--text); }
+.log-entry .result { color: var(--text-dim); white-space: nowrap; }
+.log-empty { font-size: 12px; color: var(--text-dim); text-align: center; padding: 8px 0; }
+
+.disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
+  margin: 16px auto; text-align: center; }
+footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+
+.faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.faq-btn:hover { border-color: var(--brand); color: var(--brand); }
+.faq-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.faq-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  max-width: 520px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.faq-panel h2 { font: 700 16px var(--mono); margin-bottom: 16px; }
+.faq-panel .faq-item { margin-bottom: 16px; }
+.faq-panel .faq-item dt { font: 600 12px var(--mono); color: var(--brand); margin-bottom: 4px; }
+.faq-panel .faq-item dd { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.faq-close { position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; }
+.faq-close:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Decision Boundary Lab</h1>
+      <div class="sub">Move one feature. Watch Jev's distribution shift against a fixed rule.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="faq-btn" id="faq-btn" title="What am I looking at?">?</button>
+      <div class="sub">Matchstick Labs</div>
+    </div>
+  </header>
+
+  <div class="faq-overlay" id="faq-overlay" style="display:none" role="dialog" aria-label="FAQ">
+    <div class="faq-panel" style="position:relative">
+      <button class="faq-close" id="faq-close">&times;</button>
+      <h2>What am I looking at?</h2>
+      <dl>
+        <div class="faq-item">
+          <dt>The four features</dt>
+          <dd>The same bucketed regime features the Jev Regime Screener product computes from real bars: volatility vs. its own 60-bar baseline, 10-bar trend persistence, ATR expansion vs. its 50-bar baseline, and price position vs. the 50-day SMA. Here you set them directly instead of pulling them from a real symbol.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Deterministic baseline</dt>
+          <dd>A small fixed if/else rule, written to mirror the same plain-English criteria Jev is given for each regime label. It is not ground truth — it's a transparent reference point so a disagreement means something specific: "the fixed rule says X, Jev's probabilistic read says Y," not "Jev is wrong."</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Jev's distribution</dt>
+          <dd>One typed <code>choice</code> question — five regime labels, one probability each — plus two <code>noul</code> (yes/no-as-probability) questions: is a regime change likely right now, and is a trend-following strategy compatible with this regime. Every dropdown change sends a fresh request.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Why there's no "reveal ground truth" here</dt>
+          <dd>Unlike the other three Labs plays, this isn't a scored corpus — there's no seeded label for an arbitrary feature combination. This is an evaluator/dev-mode tool for watching how one input perturbation moves a probability distribution, not a benchmark with an accuracy number.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>What's missing on purpose</dt>
+          <dd>The live Jev Regime Screener also takes a real ticker symbol, computes real 1-day and 5-day returns, and runs a trade-compatibility gate that sizes a hypothetical position. All three are removed here — this Lab only asks "what regime does Jev see," nothing about a specific market or a trade.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="intro">
+    <strong>Four bucketed regime features, no symbol attached.</strong> Change one dropdown at a
+    time and watch Jev's five-way regime distribution move, next to a fixed deterministic rule
+    built from the same plain-English criteria Jev is given. This is the feature space behind the
+    Jev Regime Screener with the symbol, the real returns, and the trade-compatibility gate
+    stripped out — an instrument for exploring where Jev's judgment agrees and disagrees with a
+    hard-coded rule, not a scored demo.
+  </div>
+
+  <div class="presets" id="presets-area"></div>
+  <div class="controls" id="controls-area"></div>
+  <div class="panels" id="panels-area"></div>
+  <div class="log" id="log-area">
+    <h3>Change log</h3>
+    <div class="log-empty">Adjust a feature above to start.</div>
+  </div>
+
+  <p class="disclosure">
+    Experimental research output. Feature values are arbitrary and not derived from any real
+    security. This demonstrates how a bounded probabilistic judgment responds to single-input
+    perturbation, not a market forecast or a trading recommendation.
+  </p>
+
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+    &middot; Classified by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; No real market data
+  </footer>
+</div>
+
+<script type="module">
+const FEATURES = {
+  vol_vs_baseline: { label: 'Volatility vs baseline', values: ['compressed', 'normal', 'elevated', 'extreme'] },
+  trend_persistence: { label: 'Trend persistence (10-bar)', values: ['strong_down', 'weak_down', 'mixed', 'weak_up', 'strong_up'] },
+  atr_expansion: { label: 'ATR expansion', values: ['contracting', 'flat', 'expanding', 'spiking'] },
+  price_vs_sma: { label: 'Price vs 50d SMA', values: ['well_below', 'below', 'near', 'above', 'well_above'] },
+};
+const FEATURE_KEYS = Object.keys(FEATURES);
+
+const REGIME_CLASSES = ['trend_up', 'trend_down', 'range', 'chop', 'unclear'];
+const REGIME_LABELS = { trend_up: 'Trend up', trend_down: 'Trend down', range: 'Range', chop: 'Chop', unclear: 'Unclear' };
+const REGIME_COLORS = { trend_up: 'var(--green)', trend_down: 'var(--red)', range: 'var(--brand)', chop: 'var(--amber)', unclear: 'var(--text-dim)' };
+
+const PRESETS = {
+  neutral: { vol_vs_baseline: 'normal', trend_persistence: 'mixed', atr_expansion: 'flat', price_vs_sma: 'near' },
+  uptrend: { vol_vs_baseline: 'normal', trend_persistence: 'strong_up', atr_expansion: 'flat', price_vs_sma: 'above' },
+  downtrend: { vol_vs_baseline: 'normal', trend_persistence: 'strong_down', atr_expansion: 'flat', price_vs_sma: 'below' },
+  chop: { vol_vs_baseline: 'extreme', trend_persistence: 'mixed', atr_expansion: 'spiking', price_vs_sma: 'near' },
+};
+const PRESET_LABELS = { neutral: 'Reset — neutral', uptrend: 'Strong uptrend', downtrend: 'Strong downtrend', chop: 'Volatile chop' };
+
+// --- Deterministic baseline: a fixed rule mirroring Jev's own regime criteria text ---
+function deterministicRegime(s) {
+  const persist = s.trend_persistence === 'mixed' ? 'mixed'
+    : (s.trend_persistence === 'strong_up' || s.trend_persistence === 'weak_up') ? 'up' : 'down';
+  const price = s.price_vs_sma === 'near' ? 'near'
+    : (s.price_vs_sma === 'above' || s.price_vs_sma === 'well_above') ? 'up' : 'down';
+  const highVol = s.vol_vs_baseline === 'elevated' || s.vol_vs_baseline === 'extreme';
+  const expandingAtr = s.atr_expansion === 'expanding' || s.atr_expansion === 'spiking';
+
+  if (highVol && expandingAtr && persist === 'mixed') {
+    return { regime: 'chop', rule: 'elevated/extreme volatility, expanding ATR, and mixed trend persistence — erratic, no follow-through.' };
+  }
+  if (persist === 'mixed' && price === 'near' && !highVol) {
+    return { regime: 'range', rule: 'mixed trend persistence, price near the SMA, volatility not elevated — bounded oscillation.' };
+  }
+  if (persist === 'up' && price === 'up') {
+    return { regime: 'trend_up', rule: 'trend persistence up and price above the 50d SMA.' };
+  }
+  if (persist === 'down' && price === 'down') {
+    return { regime: 'trend_down', rule: 'trend persistence down and price below the 50d SMA.' };
+  }
+  return { regime: 'unclear', rule: 'trend persistence and price-vs-SMA disagree — no rule resolves a clean regime.' };
+}
+
+// --- Jev ---
+const BOUNDARY_ENDPOINT = 'https://jev.matchstick.trading/api/boundary';
+const cache = new Map();
+
+function cacheKey(s) { return FEATURE_KEYS.map(k => s[k]).join('|'); }
+
+async function queryJev(s) {
+  const key = cacheKey(s);
+  if (cache.has(key)) return cache.get(key);
+  const res = await fetch(BOUNDARY_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state: s }),
+  });
+  if (!res.ok) throw new Error(`unavailable (${res.status})`);
+  const data = await res.json();
+  cache.set(key, data);
+  return data;
+}
+
+// --- State ---
+let state = { ...PRESETS.neutral };
+let inflight = false;
+
+// --- Rendering ---
+function renderPresets() {
+  const area = document.getElementById('presets-area');
+  area.innerHTML = Object.keys(PRESETS).map(p =>
+    `<button class="preset-btn" data-preset="${p}">${PRESET_LABELS[p]}</button>`
+  ).join('');
+  area.querySelectorAll('[data-preset]').forEach(btn => {
+    btn.addEventListener('click', () => update({ ...PRESETS[btn.dataset.preset] }));
+  });
+}
+
+function renderControls() {
+  const area = document.getElementById('controls-area');
+  area.innerHTML = FEATURE_KEYS.map(k => `
+    <div class="control">
+      <label for="ctrl-${k}">${FEATURES[k].label}</label>
+      <select id="ctrl-${k}" data-key="${k}">
+        ${FEATURES[k].values.map(v => `<option value="${v}" ${state[k] === v ? 'selected' : ''}>${v.replace(/_/g, ' ')}</option>`).join('')}
+      </select>
+    </div>`).join('');
+  FEATURE_KEYS.forEach(k => {
+    document.getElementById(`ctrl-${k}`).addEventListener('change', (e) => {
+      update({ ...state, [k]: e.target.value });
+    });
+  });
+}
+
+function setControlsDisabled(disabled) {
+  document.querySelectorAll('.control select, .preset-btn').forEach(el => { el.disabled = disabled; });
+}
+
+function renderBaselinePanel(det) {
+  return `
+    <div class="panel">
+      <h3>Deterministic baseline</h3>
+      <div class="baseline-badge" style="color:${REGIME_COLORS[det.regime]}">${REGIME_LABELS[det.regime]}</div>
+      <div class="baseline-rule">Rule: ${det.rule}</div>
+    </div>`;
+}
+
+function renderJevPanel(det, jev, state_) {
+  if (!jev) {
+    return `<div class="panel"><h3>Jev — regime distribution</h3><div class="jev-loading">Querying Jev...</div></div>`;
+  }
+  if (jev.error) {
+    return `<div class="panel"><h3>Jev — regime distribution</h3><div class="jev-error">Jev ${jev.error}. Baseline above is still live.</div></div>`;
+  }
+  const sorted = REGIME_CLASSES.slice().sort((a, b) => (jev.probs[b] ?? 0) - (jev.probs[a] ?? 0));
+  const top = sorted[0];
+  const agree = top === det.regime;
+  const distHtml = REGIME_CLASSES.map(c => {
+    const pct = Math.round((jev.probs[c] ?? 0) * 100);
+    return `<div class="dist-row ${c === top ? 'top' : ''}">
+      <span class="name">${REGIME_LABELS[c]}</span>
+      <span class="bar"><span class="bar-fill" style="width:${pct}%;background:${REGIME_COLORS[c]}"></span></span>
+      <span class="pct">${pct}%</span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <h3>Jev — regime distribution</h3>
+      ${distHtml}
+      <div class="gauges">
+        <div class="gauge"><div class="label">Regime change likely</div><div class="val">${Math.round(jev.changeLikely * 100)}%</div></div>
+        <div class="gauge"><div class="label">Trend strategy viable</div><div class="val">${Math.round(jev.viable * 100)}%</div></div>
+      </div>
+      <div class="match-tag ${agree ? 'agree' : 'disagree'}">${agree ? 'Jev agrees with baseline' : 'Jev diverges from baseline'}</div>
+    </div>`;
+}
+
+function renderPanels(det, jev) {
+  document.getElementById('panels-area').innerHTML =
+    renderBaselinePanel(det) + renderJevPanel(det, jev, state);
+}
+
+function logChange(prevState, newState, det, jev) {
+  const area = document.getElementById('log-area');
+  const empty = area.querySelector('.log-empty');
+  if (empty) empty.remove();
+  let list = area.querySelector('.log-list');
+  if (!list) {
+    list = document.createElement('div');
+    list.className = 'log-list';
+    area.appendChild(list);
+  }
+  const changed = FEATURE_KEYS.filter(k => prevState[k] !== newState[k]);
+  const changeText = changed.length
+    ? changed.map(k => `${FEATURES[k].label}: ${prevState[k].replace(/_/g, ' ')} → ${newState[k].replace(/_/g, ' ')}`).join(', ')
+    : 'initial state';
+  const sorted = REGIME_CLASSES.slice().sort((a, b) => (jev.probs[b] ?? 0) - (jev.probs[a] ?? 0));
+  const top = sorted[0];
+  const pct = Math.round((jev.probs[top] ?? 0) * 100);
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="change">${changeText}</span><span class="result">baseline: ${REGIME_LABELS[det.regime]} · Jev: ${REGIME_LABELS[top]} ${pct}%</span>`;
+  list.prepend(entry);
+  while (list.children.length > 12) list.removeChild(list.lastChild);
+}
+
+// --- Update flow ---
+async function update(newState) {
+  if (inflight) return;
+  inflight = true;
+  setControlsDisabled(true);
+
+  const prevState = { ...state };
+  state = newState;
+  renderControls();
+
+  const det = deterministicRegime(state);
+  renderPanels(det, null);
+
+  try {
+    const jev = await queryJev(state);
+    renderPanels(det, jev);
+    logChange(prevState, state, det, jev);
+  } catch (err) {
+    renderPanels(det, { error: err.message });
+  } finally {
+    setControlsDisabled(false);
+    inflight = false;
+  }
+}
+
+// --- FAQ ---
+document.getElementById('faq-btn').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'flex';
+});
+document.getElementById('faq-close').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'none';
+});
+document.getElementById('faq-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+
+// --- Init ---
+renderPresets();
+update({ ...PRESETS.neutral });
+</script>
+</body>
+</html>
