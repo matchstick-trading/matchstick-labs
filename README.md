@@ -12,6 +12,8 @@ fun to play with and interesting to show.
 
 - [`tape-and-ladder`](plays/tape-and-ladder/) — walk the price tape as terrain, climb the order
   book as a ladder. An arcade answer to "what if browsing data felt physical instead of visual?"
+- [`find-the-moment`](plays/find-the-moment/) — describe a market episode in plain language.
+  Deterministic code searches synthetic fixtures, Jev ranks the shortlist, you reveal ground truth.
 
 ## Why public
 

@@ -1,0 +1,282 @@
+[
+  {
+    "window_id": "fai-01",
+    "episodes": [
+      {
+        "type": "failed_upside_breakout",
+        "description": "Price broke above a trading range but failed to hold, returning inside the range quickly.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fai-02",
+    "episodes": [
+      {
+        "type": "failed_upside_breakout",
+        "description": "Price broke above a trading range but failed to hold, returning inside the range quickly.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fai-03",
+    "episodes": [
+      {
+        "type": "failed_upside_breakout",
+        "description": "Price broke above a trading range but failed to hold, returning inside the range quickly.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fai-04",
+    "episodes": [
+      {
+        "type": "failed_upside_breakout",
+        "description": "Price broke above a trading range but failed to hold, returning inside the range quickly.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "tre-01",
+    "episodes": [
+      {
+        "type": "trend_exhaustion",
+        "description": "A sustained trend stalled with declining volume and narrowing range, signaling exhaustion.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "tre-02",
+    "episodes": [
+      {
+        "type": "trend_exhaustion",
+        "description": "A sustained trend stalled with declining volume and narrowing range, signaling exhaustion.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "tre-03",
+    "episodes": [
+      {
+        "type": "trend_exhaustion",
+        "description": "A sustained trend stalled with declining volume and narrowing range, signaling exhaustion.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "tre-04",
+    "episodes": [
+      {
+        "type": "trend_exhaustion",
+        "description": "A sustained trend stalled with declining volume and narrowing range, signaling exhaustion.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "gap-01",
+    "episodes": [
+      {
+        "type": "gap_continuation",
+        "description": "A gap opening in the direction of the prior trend that held and continued higher.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "gap-02",
+    "episodes": [
+      {
+        "type": "gap_continuation",
+        "description": "A gap opening in the direction of the prior trend that held and continued higher.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "gap-03",
+    "episodes": [
+      {
+        "type": "gap_continuation",
+        "description": "A gap opening in the direction of the prior trend that held and continued higher.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "gap-04",
+    "episodes": [
+      {
+        "type": "gap_continuation",
+        "description": "A gap opening in the direction of the prior trend that held and continued higher.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fal-01",
+    "episodes": [
+      {
+        "type": "false_breakdown",
+        "description": "Price briefly broke below a range but reversed, trapping sellers in a false move.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fal-02",
+    "episodes": [
+      {
+        "type": "false_breakdown",
+        "description": "Price briefly broke below a range but reversed, trapping sellers in a false move.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fal-03",
+    "episodes": [
+      {
+        "type": "false_breakdown",
+        "description": "Price briefly broke below a range but reversed, trapping sellers in a false move.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "fal-04",
+    "episodes": [
+      {
+        "type": "false_breakdown",
+        "description": "Price briefly broke below a range but reversed, trapping sellers in a false move.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "vol-01",
+    "episodes": [
+      {
+        "type": "volatility_squeeze",
+        "description": "Volatility compressed to historic lows before an expansion move in either direction.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "vol-02",
+    "episodes": [
+      {
+        "type": "volatility_squeeze",
+        "description": "Volatility compressed to historic lows before an expansion move in either direction.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "vol-03",
+    "episodes": [
+      {
+        "type": "volatility_squeeze",
+        "description": "Volatility compressed to historic lows before an expansion move in either direction.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "vol-04",
+    "episodes": [
+      {
+        "type": "volatility_squeeze",
+        "description": "Volatility compressed to historic lows before an expansion move in either direction.",
+        "confidence": "definite"
+      }
+    ]
+  },
+  {
+    "window_id": "dis-01",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-02",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-03",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-04",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-05",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-06",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-07",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-08",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-09",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-10",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-11",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-12",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-13",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-14",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-15",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-16",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-17",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-18",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-19",
+    "episodes": []
+  },
+  {
+    "window_id": "dis-20",
+    "episodes": []
+  }
+]

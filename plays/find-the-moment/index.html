@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Find the Moment — Matchstick Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --surface: #18181b; --border: #27272a; --border-light: #3f3f46;
+  --brand: #F1479F; --brand-dim: #F1479F66;
+  --text: #fafafa; --text-muted: #a1a1aa; --text-dim: #71717a;
+  --green: #34d399; --amber: #fbbf24; --red: #f87171;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); padding: 0; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--brand); text-decoration: none; }
+
+.app { max-width: 960px; margin: 0 auto; padding: 16px; }
+
+/* Header */
+header { border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; }
+header h1 { font: 600 18px var(--mono); letter-spacing: -0.5px; }
+header .sub { font-size: 12px; color: var(--text-dim); }
+
+/* Prompt picker */
+.prompts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+.prompts h2 { font-size: 13px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 500; }
+.prompt-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 16px; text-align: left; color: var(--text); font-size: 13px;
+  transition: border-color 0.15s, background 0.15s; }
+.prompt-btn:hover { border-color: var(--border-light); background: #27272a; }
+.prompt-btn.active { border-color: var(--brand); background: #F1479F0d; }
+.prompt-btn .label { font-weight: 600; font-family: var(--mono); font-size: 12px;
+  color: var(--brand); margin-bottom: 4px; }
+
+/* Status */
+.status { text-align: center; padding: 24px; color: var(--text-dim); font-family: var(--mono);
+  font-size: 13px; }
+.status .spinner { display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border-light); border-top-color: var(--brand);
+  border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Pipeline steps */
+.pipeline { display: flex; gap: 4px; align-items: center; justify-content: center;
+  margin-bottom: 16px; font-size: 11px; font-family: var(--mono); color: var(--text-dim); }
+.pipeline .step { padding: 4px 10px; border-radius: 4px; background: var(--surface);
+  border: 1px solid var(--border); }
+.pipeline .step.active { border-color: var(--brand); color: var(--brand); }
+.pipeline .step.done { border-color: var(--green); color: var(--green); }
+.pipeline .arrow { color: var(--border-light); }
+
+/* Candidate grid */
+.candidates { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+@media (min-width: 640px) { .candidates { grid-template-columns: 1fr 1fr; } }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; transition: border-color 0.15s; position: relative; overflow: hidden; }
+.card:hover { border-color: var(--border-light); }
+.card .rank { position: absolute; top: 10px; right: 12px; font: 700 20px var(--mono);
+  color: var(--border-light); }
+.card .id { font: 500 11px var(--mono); color: var(--text-dim); margin-bottom: 8px; }
+.card .match-bar { height: 6px; border-radius: 3px; background: var(--border);
+  overflow: hidden; margin-bottom: 6px; }
+.card .match-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
+.card .match-label { font: 600 13px var(--mono); margin-bottom: 10px; }
+.card .features { display: flex; flex-wrap: wrap; gap: 4px; }
+.card .feat { font: 400 10px var(--mono); padding: 2px 6px; border-radius: 3px;
+  background: #27272a; color: var(--text-muted); }
+.card .feat .key { color: var(--text-dim); }
+
+/* Mini chart */
+.mini-chart { height: 48px; margin: 8px 0; display: flex; align-items: flex-end; gap: 1px; }
+.mini-chart .bar { flex: 1; min-width: 0; border-radius: 1px 1px 0 0; }
+
+/* Reveal */
+.reveal-btn { display: block; margin: 16px auto; padding: 10px 24px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 13px var(--mono); transition: all 0.15s; }
+.reveal-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+.truth-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font: 600 10px var(--mono);
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 8px; }
+.truth-tag.match { background: #34d39922; color: var(--green); }
+.truth-tag.miss { background: #f8717122; color: var(--red); }
+.truth-tag.distractor { background: #27272a; color: var(--text-dim); }
+
+/* Scores */
+.scores { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-top: 16px; }
+.scores h3 { font: 600 13px var(--mono); color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px; }
+.scores .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.scores .metric { }
+.scores .metric .label { font: 400 11px var(--mono); color: var(--text-dim); margin-bottom: 2px; }
+.scores .metric .value { font: 700 20px var(--mono); }
+
+/* Disclosure */
+.disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
+  margin: 16px auto; text-align: center; }
+
+/* Footer */
+footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Find the Moment</h1>
+      <div class="sub">Describe an episode. Code searches. Jev ranks. You verify.</div>
+    </div>
+    <div class="sub">Matchstick Labs</div>
+  </header>
+
+  <div class="prompts" id="prompts">
+    <h2>Choose an episode to find</h2>
+  </div>
+
+  <div id="pipeline-area"></div>
+  <div id="status-area"></div>
+  <div id="candidates-area"></div>
+  <div id="reveal-area"></div>
+  <div id="scores-area"></div>
+
+  <p class="disclosure">
+    Experimental research output using synthetic fixture data &mdash; no real securities.
+    This tool demonstrates bounded semantic search over frozen test data.
+    Jev scores are model-output match probabilities, not predictions of any market outcome.
+  </p>
+
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+    &middot; Ranked by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; Synthetic data only
+  </footer>
+</div>
+
+<script type="module">
+// --- Presets ---
+const PRESETS = [
+  {
+    id: 'failed_breakout',
+    label: 'Failed Breakout',
+    prompt: 'Find a failed upside breakout that returned inside the prior range quickly, without a hard data-integrity violation.',
+    target_type: 'failed_upside_breakout',
+    filters: { min_return_magnitude: 0 },
+  },
+  {
+    id: 'trend_exhaustion',
+    label: 'Trend Exhaustion',
+    prompt: 'Find a trend exhaustion with declining volume into a volatility squeeze.',
+    target_type: 'trend_exhaustion',
+    filters: { require_declining_volume: true },
+  },
+  {
+    id: 'gap_continuation',
+    label: 'Gap & Go',
+    prompt: 'Find a gap-and-go continuation with institutional volume confirmation.',
+    target_type: 'gap_continuation',
+    filters: { min_gap: 0.01 },
+  },
+  {
+    id: 'false_breakdown',
+    label: 'False Breakdown',
+    prompt: 'Find a range-bound accumulation with a false breakdown and reversal.',
+    target_type: 'false_breakdown',
+    filters: {},
+  },
+  {
+    id: 'vol_squeeze',
+    label: 'Volatility Squeeze',
+    prompt: 'Find a volatility expansion from compression with ambiguous direction.',
+    target_type: 'volatility_squeeze',
+    filters: { require_compression: true },
+  },
+];
+
+// --- Load fixtures ---
+let CORPUS = [];
+let LABELS = {};
+
+async function loadFixtures() {
+  const [corpusRes, labelsRes] = await Promise.all([
+    fetch('fixtures/corpus.json'),
+    fetch('fixtures/labels.json'),
+  ]);
+  CORPUS = await corpusRes.json();
+  const labelsArr = await labelsRes.json();
+  for (const l of labelsArr) LABELS[l.window_id] = l;
+}
+
+// --- Deterministic search ---
+
+function searchAndFilter(preset) {
+  let candidates = [...CORPUS];
+
+  // Apply hard filters
+  if (preset.filters.min_gap) {
+    candidates = candidates.filter(w => {
+      const gap = w.computed._raw?.maxGap ?? 0;
+      return gap >= preset.filters.min_gap;
+    });
+  }
+  if (preset.filters.require_declining_volume) {
+    candidates = candidates.filter(w => {
+      const vt = w.computed._raw?.volumeTrend ?? 0;
+      return vt < 0.15;
+    });
+  }
+  if (preset.filters.require_compression) {
+    candidates = candidates.filter(w => {
+      const ratio = w.computed._raw?.atrRatio ?? 1;
+      return ratio < 1.2;
+    });
+  }
+
+  // Score by feature relevance (deterministic heuristic)
+  const scored = candidates.map(w => {
+    let score = 0;
+    const f = w.computed;
+
+    switch (preset.id) {
+      case 'failed_breakout':
+        if (f.range_position === 'middle' || f.range_position === 'lower') score += 2;
+        if (f.gap_magnitude !== 'none') score += 1;
+        if (f.total_return === 'flat' || f.total_return === 'down') score += 2;
+        if (f.volume_trend === 'rising' || f.volume_trend === 'surging') score += 1;
+        break;
+      case 'trend_exhaustion':
+        if (f.total_return === 'up' || f.total_return === 'strong_up') score += 2;
+        if (f.volume_trend === 'declining' || f.volume_trend === 'drying_up') score += 2;
+        if (f.atr_compression === 'contracting' || f.atr_compression === 'squeezed') score += 2;
+        break;
+      case 'gap_continuation':
+        if (f.gap_magnitude === 'large' || f.gap_magnitude === 'notable') score += 3;
+        if (f.total_return === 'up' || f.total_return === 'strong_up') score += 2;
+        if (f.volume_trend === 'surging' || f.volume_trend === 'rising') score += 1;
+        break;
+      case 'false_breakdown':
+        if (f.range_position === 'lower' || f.range_position === 'near_low') score += 1;
+        if (f.range_position === 'middle' || f.range_position === 'upper') score += 2;
+        if (f.total_return === 'flat' || f.total_return === 'up') score += 2;
+        if (f.volume_trend === 'rising' || f.volume_trend === 'surging') score += 1;
+        break;
+      case 'vol_squeeze':
+        if (f.atr_compression === 'squeezed' || f.atr_compression === 'contracting') score += 3;
+        if (f.volatility === 'compressed' || f.volatility === 'normal') score += 1;
+        break;
+    }
+    return { window: w, score };
+  });
+
+  // Sort by heuristic score, take top 12
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 12).map(s => s.window);
+}
+
+// --- Jev ranking ---
+
+const JEV_ENDPOINT = 'https://jev.matchstick.trading/api/judge';
+
+async function rankWithJev(candidates, preset) {
+  // For each candidate, call Jev with the match question
+  const results = [];
+
+  for (const w of candidates) {
+    try {
+      const res = await fetch(JEV_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: `Does this window match the declared episode: "${preset.prompt}"`,
+          state: {
+            total_return: w.computed.total_return,
+            half_return: w.computed.half_return,
+            volatility: w.computed.volatility,
+            volume_trend: w.computed.volume_trend,
+            range_position: w.computed.range_position,
+            gap_magnitude: w.computed.gap_magnitude,
+            atr_compression: w.computed.atr_compression,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        results.push({ window: w, matchScore: data.score ?? 0.5, source: 'jev' });
+      } else {
+        results.push({ window: w, matchScore: 0.5, source: 'fallback' });
+      }
+    } catch {
+      // Jev unavailable — use deterministic heuristic as fallback
+      results.push({ window: w, matchScore: 0.5, source: 'fallback' });
+    }
+  }
+
+  results.sort((a, b) => b.matchScore - a.matchScore);
+  return results;
+}
+
+// --- Deterministic fallback ranking ---
+function rankDeterministic(candidates, preset) {
+  return searchAndFilter(preset).map((w, i) => ({
+    window: w,
+    matchScore: Math.max(0.1, 1 - i * 0.07),
+    source: 'heuristic',
+  }));
+}
+
+// --- Scoring ---
+
+function scoreResults(ranked, preset) {
+  const targetType = preset.target_type;
+
+  // Check which of top-3 are true matches
+  const top3 = ranked.slice(0, 3);
+  const top3Matches = top3.filter(r => {
+    const label = LABELS[r.window.id];
+    return label?.episodes?.some(e => e.type === targetType);
+  });
+
+  const recall3 = top3Matches.length;
+
+  // Mean reciprocal rank
+  let mrr = 0;
+  for (let i = 0; i < ranked.length; i++) {
+    const label = LABELS[ranked[i].window.id];
+    if (label?.episodes?.some(e => e.type === targetType)) {
+      mrr = 1 / (i + 1);
+      break;
+    }
+  }
+
+  // Count total matches in corpus for this type
+  const totalMatches = Object.values(LABELS).filter(l =>
+    l.episodes?.some(e => e.type === targetType)
+  ).length;
+
+  // Brier score (binary: did we rank matches above non-matches?)
+  let brierSum = 0;
+  for (const r of ranked) {
+    const label = LABELS[r.window.id];
+    const isMatch = label?.episodes?.some(e => e.type === targetType) ? 1 : 0;
+    brierSum += (r.matchScore - isMatch) ** 2;
+  }
+  const brier = brierSum / ranked.length;
+
+  return { recall3, totalMatches, mrr, brier, topMatch: top3Matches.length > 0 };
+}
+
+// --- UI ---
+
+function renderPrompts() {
+  const container = document.getElementById('prompts');
+  for (const preset of PRESETS) {
+    const btn = document.createElement('button');
+    btn.className = 'prompt-btn';
+    btn.innerHTML = `<div class="label">${preset.label}</div>${preset.prompt}`;
+    btn.addEventListener('click', () => runQuery(preset, btn));
+    container.appendChild(btn);
+  }
+}
+
+function renderPipeline(steps) {
+  const area = document.getElementById('pipeline-area');
+  area.innerHTML = `<div class="pipeline">${
+    steps.map((s, i) =>
+      (i > 0 ? '<span class="arrow">→</span>' : '') +
+      `<span class="step ${s.state}">${s.label}</span>`
+    ).join('')
+  }</div>`;
+}
+
+function renderStatus(msg) {
+  document.getElementById('status-area').innerHTML = msg
+    ? `<div class="status"><span class="spinner"></span>${msg}</div>`
+    : '';
+}
+
+function renderCandidates(ranked, revealed) {
+  const area = document.getElementById('candidates-area');
+  if (!ranked.length) { area.innerHTML = ''; return; }
+
+  let html = '<div class="candidates">';
+  for (let i = 0; i < ranked.length; i++) {
+    const r = ranked[i];
+    const w = r.window;
+    const f = w.computed;
+    const pct = Math.round(r.matchScore * 100);
+    const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)';
+
+    // Mini chart
+    const chartHtml = renderMiniChart(w.bars);
+
+    // Ground truth
+    let truthHtml = '';
+    if (revealed) {
+      const label = LABELS[w.id];
+      if (label?.episodes?.length > 0) {
+        truthHtml = label.episodes.map(e =>
+          `<span class="truth-tag match">${e.type.replace(/_/g, ' ')}</span>`
+        ).join(' ');
+      } else {
+        truthHtml = '<span class="truth-tag distractor">distractor</span>';
+      }
+    }
+
+    const featureEntries = Object.entries(f)
+      .filter(([k]) => !k.startsWith('_'))
+      .map(([k, v]) => `<span class="feat"><span class="key">${k.replace(/_/g, ' ')}:</span> ${v}</span>`)
+      .join('');
+
+    html += `
+      <div class="card">
+        <span class="rank">#${i + 1}</span>
+        <div class="id">${w.id} · ${r.source}</div>
+        <div class="match-bar"><div class="match-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="match-label" style="color:${color}">${pct}% match</div>
+        ${chartHtml}
+        <div class="features">${featureEntries}</div>
+        ${truthHtml}
+      </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function renderMiniChart(bars) {
+  const closes = bars.map(b => b.c);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+
+  const barHtmls = bars.map(b => {
+    const h = Math.max(2, ((b.c - min) / range) * 44);
+    const color = b.c >= b.o ? 'var(--green)' : 'var(--brand)';
+    return `<div class="bar" style="height:${h}px;background:${color};opacity:0.6"></div>`;
+  }).join('');
+
+  return `<div class="mini-chart">${barHtmls}</div>`;
+}
+
+function renderRevealButton(ranked, preset) {
+  const area = document.getElementById('reveal-area');
+  area.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'reveal-btn';
+  btn.textContent = 'Reveal ground truth';
+  btn.addEventListener('click', () => {
+    renderCandidates(ranked, true);
+    const scores = scoreResults(ranked, preset);
+    renderScores(scores);
+    btn.remove();
+  });
+  area.appendChild(btn);
+}
+
+function renderScores(scores) {
+  const area = document.getElementById('scores-area');
+  const r3Color = scores.recall3 >= 3 ? 'var(--green)' : scores.recall3 >= 1 ? 'var(--amber)' : 'var(--red)';
+  const mrrColor = scores.mrr >= 0.5 ? 'var(--green)' : scores.mrr > 0 ? 'var(--amber)' : 'var(--red)';
+  const brierColor = scores.brier < 0.15 ? 'var(--green)' : scores.brier < 0.3 ? 'var(--amber)' : 'var(--red)';
+
+  area.innerHTML = `
+    <div class="scores">
+      <h3>Evaluation</h3>
+      <div class="grid">
+        <div class="metric">
+          <div class="label">Recall@3</div>
+          <div class="value" style="color:${r3Color}">${scores.recall3} / ${Math.min(3, scores.totalMatches)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">MRR</div>
+          <div class="value" style="color:${mrrColor}">${scores.mrr.toFixed(2)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Brier score</div>
+          <div class="value" style="color:${brierColor}">${scores.brier.toFixed(3)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">True matches in corpus</div>
+          <div class="value">${scores.totalMatches}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// --- Main query flow ---
+
+let activePreset = null;
+
+async function runQuery(preset, btn) {
+  if (activePreset === preset.id) return;
+  activePreset = preset.id;
+
+  // Highlight active prompt
+  document.querySelectorAll('.prompt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  // Reset
+  document.getElementById('candidates-area').innerHTML = '';
+  document.getElementById('reveal-area').innerHTML = '';
+  document.getElementById('scores-area').innerHTML = '';
+
+  // Step 1: Deterministic search
+  renderPipeline([
+    { label: 'Search', state: 'active' },
+    { label: 'Filter', state: '' },
+    { label: 'Rank', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus('Searching corpus...');
+  await sleep(300); // Brief pause for visual feedback
+
+  const candidates = searchAndFilter(preset);
+
+  // Step 2: Filter
+  renderPipeline([
+    { label: 'Search', state: 'done' },
+    { label: 'Filter', state: 'active' },
+    { label: 'Rank', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Filtered to ${candidates.length} candidates`);
+  await sleep(400);
+
+  // Step 3: Jev ranking
+  renderPipeline([
+    { label: 'Search', state: 'done' },
+    { label: 'Filter', state: 'done' },
+    { label: 'Rank', state: 'active' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Ranking ${candidates.length} candidates with Jev...`);
+
+  let ranked;
+  try {
+    ranked = await rankWithJev(candidates, preset);
+  } catch {
+    // Fallback to deterministic ranking if Jev is unavailable
+    ranked = rankDeterministic(candidates, preset);
+  }
+
+  // If all results came back as fallback, try deterministic
+  if (ranked.every(r => r.source === 'fallback')) {
+    ranked = rankDeterministic(candidates, preset);
+  }
+
+  // Step 4: Display
+  renderPipeline([
+    { label: 'Search', state: 'done' },
+    { label: 'Filter', state: 'done' },
+    { label: 'Rank', state: 'done' },
+    { label: 'Display', state: 'active' },
+  ]);
+  renderStatus('');
+
+  renderCandidates(ranked, false);
+  renderRevealButton(ranked, preset);
+
+  renderPipeline([
+    { label: 'Search', state: 'done' },
+    { label: 'Filter', state: 'done' },
+    { label: 'Rank', state: 'done' },
+    { label: 'Display', state: 'done' },
+  ]);
+
+  activePreset = null;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// --- Init ---
+async function init() {
+  renderStatus('Loading fixtures...');
+  await loadFixtures();
+  renderStatus('');
+  renderPrompts();
+}
+
+init();
+</script>
+</body>
+</html>
