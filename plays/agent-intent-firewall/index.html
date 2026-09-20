@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Agent Intent Firewall — Matchstick Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --surface: #18181b; --border: #27272a; --border-light: #3f3f46;
+  --brand: #F1479F; --brand-dim: #F1479F66;
+  --text: #fafafa; --text-muted: #a1a1aa; --text-dim: #71717a;
+  --green: #34d399; --amber: #fbbf24; --red: #f87171;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); padding: 0; }
+button { font: inherit; cursor: pointer; }
+textarea, select { font: inherit; }
+a { color: var(--brand); text-decoration: none; }
+
+.app { max-width: 880px; margin: 0 auto; padding: 16px; }
+
+header { border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; }
+header h1 { font: 600 18px var(--mono); letter-spacing: -0.5px; }
+header .sub { font-size: 12px; color: var(--text-dim); }
+
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.intro strong { color: var(--text); }
+.intro .paper-line { color: var(--green); font-weight: 600; display: block; margin-bottom: 8px; }
+
+.input-area { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 12px; }
+.input-area textarea { width: 100%; min-height: 56px; resize: vertical; background: #27272a;
+  border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 10px;
+  font: 500 13px var(--mono); }
+.input-area textarea:focus { outline: none; border-color: var(--brand); }
+.input-row { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.draft-btn { padding: 9px 20px; border-radius: 6px; background: var(--brand); border: 1px solid var(--brand);
+  color: #09090b; font: 700 12px var(--mono); transition: opacity 0.15s; }
+.draft-btn:hover { opacity: 0.85; }
+.draft-btn:disabled { opacity: 0.4; cursor: default; }
+.char-count { font: 400 11px var(--mono); color: var(--text-dim); margin-left: auto; }
+
+.examples { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.example-btn { padding: 5px 10px; border-radius: 6px; background: var(--surface);
+  border: 1px solid var(--border); color: var(--text-dim); font: 400 11px var(--mono);
+  transition: all 0.15s; max-width: 100%; text-align: left; }
+.example-btn:hover { border-color: var(--brand); color: var(--brand); }
+.example-btn:disabled { opacity: 0.4; cursor: default; }
+
+.pipeline { display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 16px; font-size: 11px; font-family: var(--mono); color: var(--text-dim); }
+.pipeline .step { padding: 4px 10px; border-radius: 4px; background: var(--surface);
+  border: 1px solid var(--border); }
+.pipeline .step.active { border-color: var(--brand); color: var(--brand); }
+.pipeline .step.done { border-color: var(--green); color: var(--green); }
+.pipeline .arrow { color: var(--border-light); }
+
+.status { text-align: center; padding: 16px; color: var(--text-dim); font-family: var(--mono); font-size: 13px; }
+.status .spinner { display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--border-light); border-top-color: var(--brand);
+  border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.result-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+@media (min-width: 720px) { .result-grid { grid-template-columns: 1fr 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.panel h3 { font: 600 12px var(--mono); color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px; }
+
+.draft-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-family: var(--mono); }
+.draft-row .k { color: var(--text-dim); }
+.draft-row .v { color: var(--text); font-weight: 600; }
+.draft-row .v.buy { color: var(--green); }
+.draft-row .v.sell { color: var(--red); }
+.draft-row .v.null { color: var(--text-dim); font-weight: 400; font-style: italic; }
+.restatement { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted); font-style: italic; }
+.confidence-badge { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 4px;
+  font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
+.confidence-badge.high { background: #34d39922; color: var(--green); }
+.confidence-badge.medium { background: #fbbf2422; color: var(--amber); }
+.confidence-badge.low { background: #f8717122; color: var(--red); }
+
+.risk-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-family: var(--mono); }
+.risk-row .k { color: var(--text-dim); }
+.risk-row .v { color: var(--text); font-weight: 600; }
+.risk-row .v.undefined { color: var(--red); }
+.risk-bucket { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 4px;
+  font: 600 10px var(--mono); text-transform: uppercase; letter-spacing: 0.05em; }
+.risk-bucket.none { background: #27272a; color: var(--text-dim); }
+.risk-bucket.mild { background: #34d39922; color: var(--green); }
+.risk-bucket.notable { background: #fbbf2422; color: var(--amber); }
+.risk-bucket.severe { background: #f8717122; color: var(--red); }
+
+.gauge-row { margin-bottom: 10px; }
+.gauge-row .label { display: flex; justify-content: space-between; font: 500 11px var(--mono);
+  color: var(--text-muted); margin-bottom: 4px; }
+.gauge-row .bar { height: 8px; background: #27272a; border-radius: 4px; overflow: hidden; }
+.gauge-row .bar-fill { height: 100%; background: var(--brand); transition: width 0.4s ease-out; }
+
+.gate-banner { border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid; }
+.gate-banner.ready { background: #34d39915; border-color: var(--green); }
+.gate-banner.review { background: #fbbf2415; border-color: var(--amber); }
+.gate-banner.blocked { background: #f8717115; border-color: var(--red); }
+.gate-banner .title { font: 700 15px var(--mono); margin-bottom: 6px; }
+.gate-banner.ready .title { color: var(--green); }
+.gate-banner.review .title { color: var(--amber); }
+.gate-banner.blocked .title { color: var(--red); }
+.gate-banner ul { margin: 8px 0 0 18px; padding: 0; font-size: 12px; color: var(--text-muted); }
+.gate-banner li { margin-bottom: 4px; }
+.gate-banner .paper-reminder { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-dim); }
+
+.log { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+.log h3 { font: 600 12px var(--mono); color: var(--text-dim); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 10px; }
+.log-entry { font: 400 11px var(--mono); color: var(--text-muted); padding: 7px 0;
+  border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.log-entry:last-child { border-bottom: none; }
+.log-entry .req { color: var(--text); max-width: 60%; }
+.log-entry .tag { font-weight: 600; white-space: nowrap; }
+.log-entry .tag.ready { color: var(--green); }
+.log-entry .tag.review { color: var(--amber); }
+.log-entry .tag.blocked { color: var(--red); }
+.log-empty { font-size: 12px; color: var(--text-dim); text-align: center; padding: 8px 0; }
+
+.disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
+  margin: 16px auto; text-align: center; }
+footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+
+.faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.faq-btn:hover { border-color: var(--brand); color: var(--brand); }
+.faq-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.faq-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.faq-panel h2 { font: 700 16px var(--mono); margin-bottom: 16px; }
+.faq-panel .faq-item { margin-bottom: 16px; }
+.faq-panel .faq-item dt { font: 600 12px var(--mono); color: var(--brand); margin-bottom: 4px; }
+.faq-panel .faq-item dd { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.faq-close { position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; }
+.faq-close:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Agent Intent Firewall</h1>
+      <div class="sub">An LLM drafts. Code computes risk. Jev judges. Code decides. You review.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="faq-btn" id="faq-btn" title="How does this work?">?</button>
+      <div class="sub">Matchstick Labs</div>
+    </div>
+  </header>
+
+  <div class="faq-overlay" id="faq-overlay" style="display:none" role="dialog" aria-label="FAQ">
+    <div class="faq-panel" style="position:relative">
+      <button class="faq-close" id="faq-close">&times;</button>
+      <h2>How does this work?</h2>
+      <dl>
+        <div class="faq-item">
+          <dt>Draft — a general LLM</dt>
+          <dd>A general chat model reads your plain-English request and drafts a structured order: instrument, side, size, order type, and any stop-loss distance. It only interprets and drafts — it has no ability to execute, submit, or connect to anything.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Compute — deterministic code, in your browser</dt>
+          <dd>Fixed, inspectable arithmetic against a small illustrative contract-spec table (tick value, point value, margin, and a reference price per instrument) computes exposure, margin, tick value, max loss, and what share of a fixed illustrative daily-loss limit that max loss would consume. View source to see the exact numbers used.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Judge — Jev</dt>
+          <dd>Jev never sees dollar figures — only your original text, the draft's restatement, and bucketed signals (stop-loss present or not, how severe the daily-loss impact bucket is, the drafting model's own confidence). It answers three bounded yes/no-as-probability questions: does the draft match your intent, is the request ambiguous, and should a human review it.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Decide — deterministic code, again</dt>
+          <dd>Code owns the final gate, not Jev. A draft missing instrument, side, or quantity is blocked before Jev is ever asked. A missing stop-loss or a severe daily-loss bucket always forces review, regardless of what Jev says. Beyond that, review is also triggered if Jev's intent-match score is low or its ambiguity score is high. Jev's own "needs review" score is shown but only forces the gate on its own when unusually high — in testing it leans cautious by default for almost any real order, so code treats it as one input among several rather than a single switch.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Paper-trade draft only</dt>
+          <dd>There is no broker connection anywhere in this Lab. Every outcome — ready, review required, or blocked — is a draft, full stop. Nothing here is ever submitted or executed.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="intro">
+    <span class="paper-line">Paper-trade drafts only — nothing here submits, executes, or connects to a broker.</span>
+    <strong>Type a plain-English order request.</strong> A general LLM drafts it into a structured
+    order. Deterministic code computes tick value, exposure, margin, and max loss against a small
+    illustrative contract table. Jev judges whether the draft matches what you asked, whether the
+    request was ambiguous, and whether it should be reviewed. Code — not Jev — makes the final call
+    on what happens to the draft.
+  </div>
+
+  <div class="input-area">
+    <textarea id="request-input" placeholder="e.g. buy 2 ES contracts if it breaks above 5900, stop loss 20 points below" maxlength="500"></textarea>
+    <div class="input-row">
+      <button class="draft-btn" id="draft-btn">Draft it</button>
+      <span class="char-count" id="char-count">0 / 500</span>
+    </div>
+  </div>
+  <div class="examples" id="examples-area"></div>
+
+  <div id="pipeline-area"></div>
+  <div id="status-area"></div>
+  <div id="result-area"></div>
+  <div class="log" id="log-area">
+    <h3>Session log</h3>
+    <div class="log-empty">Try a request above to start.</div>
+  </div>
+
+  <p class="disclosure">
+    Experimental research output. Contract specs (tick value, margin, reference price) are
+    illustrative approximations, not live or authoritative figures, and the daily-loss limit is a
+    fixed illustrative constant. This demonstrates a bounded review pipeline, not a market forecast,
+    a trading recommendation, or a broker integration of any kind.
+  </p>
+
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+    &middot; Judged by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; No broker connection, ever
+  </footer>
+</div>
+
+<script type="module">
+// --- Illustrative contract specs (not live data) ---
+const INSTRUMENTS = {
+  ES: { name: 'E-mini S&P 500', tickSize: 0.25, tickValue: 12.50, pointValue: 50, marginPerContract: 13200, refPrice: 5900 },
+  NQ: { name: 'E-mini Nasdaq-100', tickSize: 0.25, tickValue: 5.00, pointValue: 20, marginPerContract: 17600, refPrice: 20500 },
+  CL: { name: 'Crude Oil', tickSize: 0.01, tickValue: 10.00, pointValue: 1000, marginPerContract: 5500, refPrice: 68 },
+  GC: { name: 'Gold', tickSize: 0.10, tickValue: 10.00, pointValue: 100, marginPerContract: 8800, refPrice: 2650 },
+  '6E': { name: 'Euro FX', tickSize: 0.00005, tickValue: 6.25, pointValue: 125000, marginPerContract: 2200, refPrice: 1.08 },
+};
+const DAILY_LOSS_LIMIT = 5000; // illustrative fixed paper-account constant
+
+const EXAMPLES = [
+  'buy 2 ES contracts if it breaks above 5900, stop loss 20 points below',
+  'buy 50 ES contracts market order, no stop',
+  'get me some gold exposure',
+  'short 10 CL, stop 2 dollars above entry',
+];
+
+const fmtUSD = (n) => n == null ? null : '$' + Math.round(n).toLocaleString();
+
+function computeRisk(draft) {
+  const inst = INSTRUMENTS[draft.instrument];
+  if (!inst) return null;
+  const qty = draft.quantity ?? 0;
+  const entryPrice = draft.limitPrice ?? draft.stopPrice ?? inst.refPrice;
+  const exposure = entryPrice * inst.pointValue * qty;
+  const margin = inst.marginPerContract * qty;
+  const tickValueTotal = inst.tickValue * qty;
+  const maxLoss = draft.stopLossPoints != null ? draft.stopLossPoints * inst.pointValue * qty : null;
+  const dailyLossImpactPct = maxLoss != null ? (maxLoss / DAILY_LOSS_LIMIT) * 100 : null;
+  return { inst, entryPrice, exposure, margin, tickValueTotal, maxLoss, dailyLossImpactPct };
+}
+
+function bucketDailyLossImpact(pct) {
+  if (pct == null) return 'severe'; // no stop-loss = unbounded risk
+  if (pct < 10) return 'none';
+  if (pct < 40) return 'mild';
+  if (pct < 80) return 'notable';
+  return 'severe';
+}
+
+function draftComplete(draft) {
+  return Boolean(draft.instrument && draft.side && draft.quantity);
+}
+
+// --- Gate: code owns this decision, not Jev ---
+function decideGate(draft, risk, judgment, judgmentError) {
+  if (!draftComplete(draft)) {
+    return { status: 'blocked', reasons: ['Draft is missing a required field (instrument, side, or quantity) — code caught this before Jev was ever asked.'] };
+  }
+
+  const reasons = [];
+  const bucket = bucketDailyLossImpact(risk?.dailyLossImpactPct);
+
+  if (draft.stopLossPoints == null) {
+    reasons.push('No stop-loss was given, so max loss is undefined.');
+  }
+  if (bucket === 'severe' && draft.stopLossPoints != null) {
+    reasons.push(`Max loss (${fmtUSD(risk.maxLoss)}) would consume ${Math.round(risk.dailyLossImpactPct)}% of the illustrative daily-loss limit.`);
+  }
+
+  if (judgmentError) {
+    reasons.push('Jev judgment was unavailable — routed to review as a fail-safe.');
+  } else if (judgment) {
+    if (judgment.matchesIntent < 0.7) {
+      reasons.push(`Jev is only ${Math.round(judgment.matchesIntent * 100)}% confident the draft matches your request.`);
+    }
+    if (judgment.ambiguous > 0.5) {
+      reasons.push(`Jev reads the original request as ambiguous (${Math.round(judgment.ambiguous * 100)}%).`);
+    }
+    if (judgment.needsReview > 0.9) {
+      reasons.push(`Jev strongly flags this draft for human review (${Math.round(judgment.needsReview * 100)}%).`);
+    }
+  }
+
+  return reasons.length ? { status: 'review', reasons } : { status: 'ready', reasons: [] };
+}
+
+// --- API ---
+const DRAFT_ENDPOINT = 'https://jev.matchstick.trading/api/draft';
+const JUDGE_ENDPOINT = 'https://jev.matchstick.trading/api/judge-intent';
+
+async function fetchDraft(text) {
+  const res = await fetch(DRAFT_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw new Error(`draft unavailable (${res.status})`);
+  const data = await res.json();
+  return data.draft;
+}
+
+async function fetchJudgment(text, draft, risk) {
+  const state = {
+    original_request: text,
+    draft_restatement: draft.restatement ?? '',
+    draft_instrument: draft.instrument ?? 'none',
+    draft_side: draft.side ?? 'none',
+    draft_quantity: String(draft.quantity ?? 'none'),
+    draft_order_type: draft.orderType ?? 'unspecified',
+    stop_loss_specified: draft.stopLossPoints != null ? 'yes' : 'no',
+    draft_llm_confidence: draft.confidence ?? 'medium',
+    daily_loss_impact: bucketDailyLossImpact(risk?.dailyLossImpactPct),
+  };
+  const res = await fetch(JUDGE_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state }),
+  });
+  if (!res.ok) throw new Error(`judge unavailable (${res.status})`);
+  return await res.json();
+}
+
+// --- Rendering ---
+function renderPipeline(steps) {
+  document.getElementById('pipeline-area').innerHTML = `<div class="pipeline">${
+    steps.map((s, i) => (i > 0 ? '<span class="arrow">→</span>' : '') + `<span class="step ${s.state}">${s.label}</span>`).join('')
+  }</div>`;
+}
+
+function renderStatus(msg) {
+  document.getElementById('status-area').innerHTML = msg
+    ? `<div class="status"><span class="spinner"></span>${msg}</div>` : '';
+}
+
+function renderExamples() {
+  const area = document.getElementById('examples-area');
+  area.innerHTML = EXAMPLES.map(ex => `<button class="example-btn" data-ex="${ex.replace(/"/g, '&quot;')}">${ex}</button>`).join('');
+  area.querySelectorAll('[data-ex]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('request-input').value = btn.dataset.ex;
+      updateCharCount();
+      runFirewall(btn.dataset.ex);
+    });
+  });
+}
+
+function fieldRow(key, value, cls) {
+  const display = value == null ? '<span class="v null">not specified</span>' : `<span class="v ${cls ?? ''}">${value}</span>`;
+  return `<div class="draft-row"><span class="k">${key}</span>${display}</div>`;
+}
+
+function renderDraftPanel(draft) {
+  const inst = INSTRUMENTS[draft.instrument];
+  return `
+    <div class="panel">
+      <h3>Draft — LLM</h3>
+      ${fieldRow('instrument', inst ? `${draft.instrument} — ${inst.name}` : draft.instrument)}
+      ${fieldRow('side', draft.side, draft.side === 'buy' ? 'buy' : draft.side === 'sell' ? 'sell' : '')}
+      ${fieldRow('quantity', draft.quantity)}
+      ${fieldRow('order type', draft.orderType ?? 'not specified (assumed market)')}
+      ${fieldRow('limit price', draft.limitPrice)}
+      ${fieldRow('stop price', draft.stopPrice)}
+      ${fieldRow('stop-loss', draft.stopLossPoints != null ? `${draft.stopLossPoints} pts` : null)}
+      <div class="restatement">&ldquo;${draft.restatement ?? ''}&rdquo;</div>
+      <span class="confidence-badge ${draft.confidence ?? 'medium'}">${draft.confidence ?? 'medium'} confidence</span>
+    </div>`;
+}
+
+function renderRiskPanel(risk, draft) {
+  if (!risk) {
+    const reason = INSTRUMENTS[draft.instrument] ? 'Draft is missing side or quantity' : 'Unknown or unspecified instrument';
+    return `<div class="panel"><h3>Compute — code</h3><div class="log-empty">${reason} — no risk figures.</div></div>`;
+  }
+  const bucket = bucketDailyLossImpact(risk.dailyLossImpactPct);
+  return `
+    <div class="panel">
+      <h3>Compute — code</h3>
+      <div class="risk-row"><span class="k">tick value (total)</span><span class="v">${fmtUSD(risk.tickValueTotal)}</span></div>
+      <div class="risk-row"><span class="k">exposure (notional)</span><span class="v">${fmtUSD(risk.exposure)}</span></div>
+      <div class="risk-row"><span class="k">margin (illustrative)</span><span class="v">${fmtUSD(risk.margin)}</span></div>
+      <div class="risk-row"><span class="k">max loss</span>${risk.maxLoss == null ? '<span class="v undefined">undefined — no stop</span>' : `<span class="v">${fmtUSD(risk.maxLoss)}</span>`}</div>
+      <div class="risk-row"><span class="k">vs. daily-loss limit (${fmtUSD(DAILY_LOSS_LIMIT)})</span><span class="v">${risk.dailyLossImpactPct == null ? '—' : Math.round(risk.dailyLossImpactPct) + '%'}</span></div>
+      <span class="risk-bucket ${bucket}">${bucket} daily-loss impact</span>
+    </div>`;
+}
+
+function renderJudgePanel(judgment, judgmentError) {
+  if (judgmentError) {
+    return `<div class="panel"><h3>Judge — Jev</h3><div class="log-empty" style="color:var(--red)">Jev unavailable — routed to review.</div></div>`;
+  }
+  if (!judgment) {
+    return `<div class="panel"><h3>Judge — Jev</h3><div class="log-empty">Draft incomplete — Jev was not asked.</div></div>`;
+  }
+  const gauges = [
+    ['matches your intent', judgment.matchesIntent],
+    ['ambiguous request', judgment.ambiguous],
+    ["Jev's own review flag", judgment.needsReview],
+  ];
+  return `
+    <div class="panel">
+      <h3>Judge — Jev</h3>
+      ${gauges.map(([label, v]) => `
+        <div class="gauge-row">
+          <div class="label"><span>${label}</span><span>${Math.round(v * 100)}%</span></div>
+          <div class="bar"><div class="bar-fill" style="width:${Math.round(v * 100)}%"></div></div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderGateBanner(gate) {
+  const titles = { ready: 'READY — paper-trade draft only', review: 'REVIEW REQUIRED', blocked: 'BLOCKED — draft incomplete' };
+  return `
+    <div class="gate-banner ${gate.status}">
+      <div class="title">${titles[gate.status]}</div>
+      ${gate.reasons.length ? `<ul>${gate.reasons.map(r => `<li>${r}</li>`).join('')}</ul>` : '<div style="font-size:12px;color:var(--text-muted)">No review triggers fired.</div>'}
+      <div class="paper-reminder">This is a draft only. It was never submitted, executed, or sent to a broker.</div>
+    </div>`;
+}
+
+function renderResult(draft, risk, judgment, judgmentError, gate) {
+  document.getElementById('result-area').innerHTML = `
+    ${renderGateBanner(gate)}
+    <div class="result-grid">
+      ${renderDraftPanel(draft)}
+      ${renderRiskPanel(risk, draft)}
+    </div>
+    ${draftComplete(draft) ? `<div class="result-grid" style="grid-template-columns:1fr">${renderJudgePanel(judgment, judgmentError)}</div>` : ''}
+  `;
+}
+
+function logAttempt(text, gate) {
+  const area = document.getElementById('log-area');
+  const empty = area.querySelector('.log-empty');
+  if (empty) empty.remove();
+  let list = area.querySelector('.log-list');
+  if (!list) {
+    list = document.createElement('div');
+    list.className = 'log-list';
+    area.appendChild(list);
+  }
+  const truncated = text.length > 70 ? text.slice(0, 67) + '...' : text;
+  const labels = { ready: 'READY', review: 'REVIEW', blocked: 'BLOCKED' };
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="req">${truncated}</span><span class="tag ${gate.status}">${labels[gate.status]}</span>`;
+  list.prepend(entry);
+  while (list.children.length > 12) list.removeChild(list.lastChild);
+}
+
+function updateCharCount() {
+  const input = document.getElementById('request-input');
+  document.getElementById('char-count').textContent = `${input.value.length} / 500`;
+}
+
+// --- Main flow ---
+let running = false;
+
+async function runFirewall(text) {
+  if (running || !text.trim()) return;
+  running = true;
+  document.getElementById('draft-btn').disabled = true;
+  document.querySelectorAll('.example-btn').forEach(b => b.disabled = true);
+  document.getElementById('result-area').innerHTML = '';
+
+  renderPipeline([
+    { label: 'Draft', state: 'active' },
+    { label: 'Compute', state: '' },
+    { label: 'Judge', state: '' },
+    { label: 'Decide', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus('Drafting order from your request...');
+
+  let draft;
+  try {
+    draft = await fetchDraft(text);
+  } catch (err) {
+    renderStatus('');
+    renderPipeline([{ label: 'Draft failed', state: '' }]);
+    document.getElementById('result-area').innerHTML = `<div class="gate-banner blocked"><div class="title">DRAFT UNAVAILABLE</div><div style="font-size:12px;color:var(--text-muted)">${err.message}. Try again shortly.</div></div>`;
+    document.getElementById('draft-btn').disabled = false;
+    document.querySelectorAll('.example-btn').forEach(b => b.disabled = false);
+    running = false;
+    return;
+  }
+
+  renderPipeline([
+    { label: 'Draft', state: 'done' },
+    { label: 'Compute', state: 'active' },
+    { label: 'Judge', state: '' },
+    { label: 'Decide', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  const risk = draftComplete(draft) ? computeRisk(draft) : null;
+
+  let judgment = null, judgmentError = false;
+  if (draftComplete(draft)) {
+    renderPipeline([
+      { label: 'Draft', state: 'done' },
+      { label: 'Compute', state: 'done' },
+      { label: 'Judge', state: 'active' },
+      { label: 'Decide', state: '' },
+      { label: 'Display', state: '' },
+    ]);
+    renderStatus('Asking Jev to judge the draft...');
+    try {
+      judgment = await fetchJudgment(text, draft, risk);
+    } catch {
+      judgmentError = true;
+    }
+  }
+
+  renderPipeline([
+    { label: 'Draft', state: 'done' },
+    { label: 'Compute', state: 'done' },
+    { label: 'Judge', state: draftComplete(draft) ? 'done' : '' },
+    { label: 'Decide', state: 'active' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus('');
+
+  const gate = decideGate(draft, risk, judgment, judgmentError);
+  renderResult(draft, risk, judgment, judgmentError, gate);
+  logAttempt(text, gate);
+
+  renderPipeline([
+    { label: 'Draft', state: 'done' },
+    { label: 'Compute', state: 'done' },
+    { label: 'Judge', state: draftComplete(draft) ? 'done' : '' },
+    { label: 'Decide', state: 'done' },
+    { label: 'Display', state: 'done' },
+  ]);
+
+  document.getElementById('draft-btn').disabled = false;
+  document.querySelectorAll('.example-btn').forEach(b => b.disabled = false);
+  running = false;
+}
+
+// --- FAQ ---
+document.getElementById('faq-btn').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'flex';
+});
+document.getElementById('faq-close').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'none';
+});
+document.getElementById('faq-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+
+// --- Init ---
+renderExamples();
+document.getElementById('request-input').addEventListener('input', updateCharCount);
+document.getElementById('draft-btn').addEventListener('click', () => {
+  runFirewall(document.getElementById('request-input').value);
+});
+document.getElementById('request-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    runFirewall(document.getElementById('request-input').value);
+  }
+});
+</script>
+</body>
+</html>

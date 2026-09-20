@@ -22,6 +22,9 @@ fun to play with and interesting to show.
   a deliberate trap for Jev's triage.
 - [`decision-boundary-lab`](plays/decision-boundary-lab/) — no corpus, no symbol. Move one regime
   feature at a time and watch Jev's distribution shift against a fixed deterministic rule.
+- [`agent-intent-firewall`](plays/agent-intent-firewall/) — paper-trade drafts only. An LLM drafts
+  an order from plain English, code computes the risk, Jev judges intent and ambiguity, and code —
+  not Jev — decides ready, review, or blocked.
 
 ## Why public
 
