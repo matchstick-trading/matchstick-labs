@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Market Data Incident Lab — Matchstick Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --surface: #18181b; --border: #27272a; --border-light: #3f3f46;
+  --brand: #F1479F; --brand-dim: #F1479F66;
+  --text: #fafafa; --text-muted: #a1a1aa; --text-dim: #71717a;
+  --green: #34d399; --amber: #fbbf24; --red: #f87171;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); padding: 0; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--brand); text-decoration: none; }
+
+.app { max-width: 960px; margin: 0 auto; padding: 16px; }
+
+header { border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; }
+header h1 { font: 600 18px var(--mono); letter-spacing: -0.5px; }
+header .sub { font-size: 12px; color: var(--text-dim); }
+
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.intro strong { color: var(--text); }
+
+.run-btn { display: block; margin: 0 auto 24px; padding: 12px 28px; border-radius: 8px;
+  background: var(--brand); border: 1px solid var(--brand); color: #09090b;
+  font: 700 13px var(--mono); transition: opacity 0.15s; }
+.run-btn:hover { opacity: 0.85; }
+.run-btn:disabled { opacity: 0.4; cursor: default; }
+
+.status { text-align: center; padding: 24px; color: var(--text-dim); font-family: var(--mono);
+  font-size: 13px; }
+.status .spinner { display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border-light); border-top-color: var(--brand);
+  border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pipeline { display: flex; gap: 4px; align-items: center; justify-content: center;
+  margin-bottom: 16px; font-size: 11px; font-family: var(--mono); color: var(--text-dim); }
+.pipeline .step { padding: 4px 10px; border-radius: 4px; background: var(--surface);
+  border: 1px solid var(--border); }
+.pipeline .step.active { border-color: var(--brand); color: var(--brand); }
+.pipeline .step.done { border-color: var(--green); color: var(--green); }
+.pipeline .arrow { color: var(--border-light); }
+
+.candidates { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+@media (min-width: 640px) { .candidates { grid-template-columns: 1fr 1fr; } }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; transition: border-color 0.15s; position: relative; }
+.card:hover { border-color: var(--border-light); }
+.card.flagged { border-color: var(--brand-dim); }
+.card .id { font: 500 11px var(--mono); color: var(--text-dim); margin-bottom: 8px; }
+.card .verdict-bar { height: 6px; border-radius: 3px; background: var(--border);
+  overflow: hidden; margin-bottom: 6px; }
+.card .verdict-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
+.card .verdict-label { font: 600 13px var(--mono); margin-bottom: 10px; }
+.card .features { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.card .feat { font: 400 10px var(--mono); padding: 2px 6px; border-radius: 3px;
+  background: #27272a; color: var(--text-muted); }
+.card .feat.hot { color: var(--amber); }
+.card .feat .key { color: var(--text-dim); }
+
+.diag-btn { display: block; width: 100%; padding: 6px 10px; border-radius: 6px;
+  background: #27272a; border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 11px var(--mono); text-align: center; transition: all 0.15s; margin-bottom: 8px; }
+.diag-btn:hover { border-color: var(--brand); color: var(--brand); }
+.diag-result { font-size: 11px; font-family: var(--mono); padding: 8px; border-radius: 6px;
+  margin-bottom: 8px; line-height: 1.5; }
+.diag-result.confirmed { background: #f8717122; color: var(--red); }
+.diag-result.clear { background: #34d39922; color: var(--green); }
+
+.truth-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font: 600 10px var(--mono);
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.truth-tag.hit { background: #34d39922; color: var(--green); }
+.truth-tag.miss { background: #f8717122; color: var(--red); }
+.truth-tag.clean-hit { background: #27272a; color: var(--text-dim); }
+.truth-tag.hard-negative { background: #fbbf2422; color: var(--amber); }
+
+.scores { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-top: 16px; }
+.scores h3 { font: 600 13px var(--mono); color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px; }
+.scores .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.scores .metric .label { font: 400 11px var(--mono); color: var(--text-dim); margin-bottom: 2px; }
+.scores .metric .value { font: 700 20px var(--mono); }
+
+.reveal-btn { display: block; margin: 16px auto; padding: 10px 24px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 13px var(--mono); transition: all 0.15s; }
+.reveal-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+.disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
+  margin: 16px auto; text-align: center; }
+footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+
+.faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.faq-btn:hover { border-color: var(--brand); color: var(--brand); }
+.faq-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.faq-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  max-width: 520px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.faq-panel h2 { font: 700 16px var(--mono); margin-bottom: 16px; }
+.faq-panel .faq-item { margin-bottom: 16px; }
+.faq-panel .faq-item dt { font: 600 12px var(--mono); color: var(--brand); margin-bottom: 4px; }
+.faq-panel .faq-item dd { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.faq-close { position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; }
+.faq-close:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Market Data Incident Lab</h1>
+      <div class="sub">Code finds the facts. Jev triages what's left ambiguous.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="faq-btn" id="faq-btn" title="What do these metrics mean?">?</button>
+      <div class="sub">Matchstick Labs</div>
+    </div>
+  </header>
+
+  <div class="faq-overlay" id="faq-overlay" style="display:none" role="dialog" aria-label="FAQ">
+    <div class="faq-panel" style="position:relative">
+      <button class="faq-close" id="faq-close">&times;</button>
+      <h2>What do these metrics mean?</h2>
+      <dl>
+        <div class="faq-item">
+          <dt>Cheap diagnostics</dt>
+          <dd>Five always-on summary stats computed instantly for every run: the longest run of frozen quotes, how many quotes are crossed, how many prints are exact duplicates, how many prints arrived out of timestamp order, and the size of the largest single-print price jump. Each is bucketed none / mild / notable / severe.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>The trap: genuine discontinuities</dt>
+          <dd>5 of the 15 clean runs carry a real, explained price jump &mdash; an earnings move or a halt/resume &mdash; with no other feed symptom. To the cheap "price jump" diagnostic, this looks identical to an unadjusted split. Jev cannot see the recorded event, only the bucketed jump size, so it will often guess wrong on these by design. Only the deterministic check, which looks up the recorded event, can tell the two apart.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Jev's guess</dt>
+          <dd>Jev never sees the raw run &mdash; only the five bucketed diagnostics. It picks the most likely incident family (or "clean") from a fixed list and returns a probability for each.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Run diagnostic</dt>
+          <dd>Executes the one deterministic check that can actually confirm Jev's guess &mdash; a run-length scan, a bounds check, a timestamp-order scan, or a recorded-event lookup. This is the only step that establishes a fact.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Accuracy / Missed / False alarms / Brier</dt>
+          <dd>Accuracy: share of the 45 runs where Jev's top guess matches the truth. Missed: a real incident Jev called clean. False alarm: a clean run Jev flagged (this is where genuine discontinuities usually land). Brier: average squared error between Jev's full probability vector and the true one-hot label across all six classes &mdash; lower is better.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="intro">
+    <strong>45 synthetic tick/quote feed runs.</strong> Five have a structurally real incident
+    seeded in — a frozen quote, a crossed book, a duplicate print, an out-of-order print, or an
+    unadjusted split — 10 are quietly clean, and 5 are clean but carry a genuine, explained price
+    jump (an earnings move or halt/resume) with no other symptom. That last group is the trap: to a
+    bare price-jump statistic, a real news move and an unadjusted split look identical. Jev only
+    sees the bucketed statistics, never the raw feed or any recorded event, so it will sometimes
+    call a real move a bug — that's the point of running the diagnostic afterward.
+  </div>
+
+  <button class="run-btn" id="run-btn">Run Incident Lab</button>
+
+  <div id="pipeline-area"></div>
+  <div id="status-area"></div>
+  <div id="candidates-area"></div>
+  <div id="reveal-area"></div>
+  <div id="scores-area"></div>
+
+  <p class="disclosure">
+    Experimental research output using synthetic fixture data &mdash; no real securities, no real
+    feed. This demonstrates bounded triage classification over frozen test data, not a production
+    market-data monitor. Jev's probabilities are model-output triage scores, not guarantees.
+  </p>
+
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+    &middot; Triaged by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; Synthetic data only
+  </footer>
+</div>
+
+<script type="module">
+// --- Incident taxonomy ---
+const FAMILIES = [
+  'stale_quote',
+  'crossed_book',
+  'duplicate_tick',
+  'out_of_order_event',
+  'unadjusted_split',
+];
+const ALL_CLASSES = [...FAMILIES, 'clean'];
+
+const FAMILY_LABELS = {
+  stale_quote: 'Stale quote',
+  crossed_book: 'Crossed book',
+  duplicate_tick: 'Duplicate tick',
+  out_of_order_event: 'Out-of-order event',
+  unadjusted_split: 'Unadjusted split',
+  clean: 'Clean',
+};
+
+// --- Deterministic confirming diagnostics (mirror fixtures/generate.mjs injections) ---
+
+const CHECKERS = {
+  stale_quote(run) {
+    let longest = 0, current = 1, start = 0, bestStart = 0;
+    for (let i = 1; i < run.quotes.length; i++) {
+      if (run.quotes[i].bid === run.quotes[i - 1].bid && run.quotes[i].ask === run.quotes[i - 1].ask) {
+        current++;
+      } else {
+        if (current > longest) { longest = current; bestStart = start; }
+        current = 1; start = i;
+      }
+    }
+    if (current > longest) { longest = current; bestStart = start; }
+    const confirmed = longest >= 6;
+    return confirmed
+      ? { confirmed: true, evidence: `Quote frozen at $${run.quotes[bestStart].bid}/$${run.quotes[bestStart].ask} for ${longest} consecutive prints (ticks #${bestStart + 1}–#${bestStart + longest}) while trades continued.` }
+      : { confirmed: false, evidence: `Longest frozen-quote run is ${longest} prints — within normal book behavior.` };
+  },
+  crossed_book(run) {
+    const idx = run.quotes.findIndex(q => q.bid >= q.ask);
+    return idx >= 0
+      ? { confirmed: true, evidence: `Quote #${idx + 1} crossed: bid $${run.quotes[idx].bid} > ask $${run.quotes[idx].ask}.` }
+      : { confirmed: false, evidence: 'No quote found with bid at or above ask.' };
+  },
+  duplicate_tick(run) {
+    for (let i = 1; i < run.ticks.length; i++) {
+      const a = run.ticks[i], b = run.ticks[i - 1];
+      if (a.t === b.t && a.price === b.price && a.size === b.size) {
+        return { confirmed: true, evidence: `Tick #${i + 1} is an exact duplicate of tick #${i} (t=${a.t}, $${a.price} x ${a.size}).` };
+      }
+    }
+    return { confirmed: false, evidence: 'No exact duplicate consecutive print found.' };
+  },
+  out_of_order_event(run) {
+    for (let i = 1; i < run.ticks.length; i++) {
+      if (run.ticks[i].t < run.ticks[i - 1].t) {
+        return { confirmed: true, evidence: `Tick #${i + 1} (seq ${run.ticks[i].seq}) is timestamped before tick #${i} (seq ${run.ticks[i - 1].seq}), despite a later sequence number.` };
+      }
+    }
+    return { confirmed: false, evidence: 'All prints arrive in non-decreasing timestamp order.' };
+  },
+  unadjusted_split(run) {
+    let maxJump = 0, maxIdx = -1;
+    for (let i = 1; i < run.ticks.length; i++) {
+      const r = Math.abs(run.ticks[i].price - run.ticks[i - 1].price) / run.ticks[i - 1].price;
+      if (r > maxJump) { maxJump = r; maxIdx = i; }
+    }
+    const event = run.events.find(e => Math.abs(e.tick_index - maxIdx) <= 1);
+    if (maxJump < 0.15) {
+      return { confirmed: false, evidence: 'No unexplained large price jump found.' };
+    }
+    if (event) {
+      return { confirmed: false, evidence: `Tick #${maxIdx + 1} shows a ${(maxJump * 100).toFixed(0)}% jump, but it matches a recorded ${event.type.replace('_', ' ')} — not a feed defect.` };
+    }
+    return { confirmed: true, evidence: `Tick #${maxIdx + 1} shows a ${(maxJump * 100).toFixed(0)}% jump with no recorded corporate-action or news event behind it.` };
+  },
+};
+
+function runDiagnostic(run, predictedFamily) {
+  if (predictedFamily === 'clean') {
+    for (const fam of FAMILIES) {
+      const r = CHECKERS[fam](run);
+      if (r.confirmed) return { family: fam, ...r };
+    }
+    return { family: null, confirmed: false, evidence: 'Spot-checked all five diagnostics — none confirm an incident.' };
+  }
+  return { family: predictedFamily, ...CHECKERS[predictedFamily](run) };
+}
+
+// --- Load fixtures ---
+let CORPUS = [];
+let LABELS = {};
+let HARD_NEGATIVES = new Set();
+
+async function loadFixtures() {
+  const [corpusRes, labelsRes] = await Promise.all([
+    fetch('fixtures/corpus.json'),
+    fetch('fixtures/labels.json'),
+  ]);
+  CORPUS = await corpusRes.json();
+  const labelsArr = await labelsRes.json();
+  for (const l of labelsArr) LABELS[l.run_id] = l.incident ? l.incident.type : 'clean';
+  for (const r of CORPUS) {
+    if (LABELS[r.id] === 'clean' && r.events.length > 0) HARD_NEGATIVES.add(r.id);
+  }
+}
+
+// --- Jev triage ---
+
+const INCIDENT_ENDPOINT = 'https://jev.matchstick.trading/api/incident';
+
+async function triageOne(run) {
+  const state = { ...run.computed };
+  delete state._raw;
+  try {
+    const res = await fetch(INCIDENT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+    }
+    return { run, ...heuristicGuess(run), source: 'heuristic' };
+  } catch {
+    return { run, ...heuristicGuess(run), source: 'heuristic' };
+  }
+}
+
+// Deterministic fallback if Jev is unreachable: pick the single hottest bucket.
+function heuristicGuess(run) {
+  const order = { none: 0, mild: 1, notable: 2, severe: 3 };
+  const map = {
+    stale_quote: run.computed.quote_staleness,
+    crossed_book: run.computed.cross_rate,
+    duplicate_tick: run.computed.duplicate_rate,
+    out_of_order_event: run.computed.sequence_violations,
+    unadjusted_split: run.computed.price_jump,
+  };
+  let best = 'clean', bestScore = 0;
+  for (const [fam, bucket] of Object.entries(map)) {
+    if (order[bucket] > bestScore) { best = fam; bestScore = order[bucket]; }
+  }
+  const confidence = bestScore === 0 ? 0.6 : Math.min(0.9, 0.4 + bestScore * 0.15);
+  const probs = Object.fromEntries(ALL_CLASSES.map(c => [c, c === best ? confidence : (1 - confidence) / (ALL_CLASSES.length - 1)]));
+  return { family: best, probabilities: probs, confidence };
+}
+
+async function triageAll(runs, onProgress) {
+  const results = [];
+  const batchSize = 6;
+  for (let i = 0; i < runs.length; i += batchSize) {
+    const batch = runs.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(triageOne));
+    results.push(...batchResults);
+    onProgress(results.length, runs.length);
+  }
+  return results;
+}
+
+// --- Scoring ---
+
+function scoreResults(results) {
+  let correct = 0, missed = 0, falseAlarm = 0, brierSum = 0, hardNegativeMisses = 0;
+  for (const r of results) {
+    const truth = LABELS[r.run.id];
+    if (r.family === truth) correct++;
+    if (truth !== 'clean' && r.family === 'clean') missed++;
+    if (truth === 'clean' && r.family !== 'clean') {
+      falseAlarm++;
+      if (HARD_NEGATIVES.has(r.run.id)) hardNegativeMisses++;
+    }
+
+    let sq = 0;
+    for (const c of ALL_CLASSES) {
+      const p = r.probabilities?.[c] ?? (c === r.family ? 1 : 0);
+      const y = c === truth ? 1 : 0;
+      sq += (p - y) ** 2;
+    }
+    brierSum += sq;
+  }
+  return {
+    accuracy: correct / results.length,
+    correct,
+    total: results.length,
+    missed,
+    falseAlarm,
+    hardNegativeMisses,
+    brier: brierSum / results.length,
+  };
+}
+
+// --- UI ---
+
+function renderPipeline(steps) {
+  document.getElementById('pipeline-area').innerHTML = `<div class="pipeline">${
+    steps.map((s, i) => (i > 0 ? '<span class="arrow">→</span>' : '') + `<span class="step ${s.state}">${s.label}</span>`).join('')
+  }</div>`;
+}
+
+function renderStatus(msg) {
+  document.getElementById('status-area').innerHTML = msg
+    ? `<div class="status"><span class="spinner"></span>${msg}</div>` : '';
+}
+
+function renderCandidates(results, revealed) {
+  const area = document.getElementById('candidates-area');
+  let html = '<div class="candidates">';
+  for (const r of results) {
+    const pct = Math.round((r.confidence ?? r.probabilities?.[r.family] ?? 0) * 100);
+    const color = r.family === 'clean' ? 'var(--text-dim)' : (pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)');
+    const flagged = r.family !== 'clean';
+
+    const c = r.run.computed;
+    const feats = [
+      ['quote staleness', c.quote_staleness],
+      ['cross rate', c.cross_rate],
+      ['duplicate rate', c.duplicate_rate],
+      ['sequence', c.sequence_violations],
+      ['price jump', c.price_jump],
+    ];
+    const featHtml = feats.map(([k, v]) =>
+      `<span class="feat ${v === 'severe' || v === 'notable' ? 'hot' : ''}"><span class="key">${k}:</span> ${v}</span>`
+    ).join('');
+
+    let truthHtml = '';
+    if (revealed) {
+      const truth = LABELS[r.run.id];
+      const isHardNegative = HARD_NEGATIVES.has(r.run.id);
+      if (truth === r.family) {
+        truthHtml = `<span class="truth-tag ${truth === 'clean' ? 'clean-hit' : 'hit'}">${truth === 'clean' ? (isHardNegative ? 'correctly clean (hard case)' : 'correctly clean') : 'confirmed match'}</span>`;
+      } else if (isHardNegative) {
+        truthHtml = `<span class="truth-tag hard-negative">genuine event, not a bug</span>`;
+      } else {
+        truthHtml = `<span class="truth-tag miss">actually: ${FAMILY_LABELS[truth]}</span>`;
+      }
+    }
+
+    html += `
+      <div class="card ${flagged ? 'flagged' : ''}" data-id="${r.run.id}">
+        <div class="id">${r.run.id} · ${r.source}</div>
+        <div class="verdict-bar"><div class="verdict-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="verdict-label" style="color:${color}">${FAMILY_LABELS[r.family] ?? r.family} · ${pct}%</div>
+        <div class="features">${featHtml}</div>
+        <button class="diag-btn" data-action="diagnose">${flagged ? 'Run diagnostic' : 'Spot-check anyway'}</button>
+        <div class="diag-out"></div>
+        ${truthHtml}
+      </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+
+  area.querySelectorAll('[data-action="diagnose"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('.card');
+      const id = card.dataset.id;
+      const result = results.find(r => r.run.id === id);
+      const diag = runDiagnostic(result.run, result.family);
+      const out = card.querySelector('.diag-out');
+      out.innerHTML = `<div class="diag-result ${diag.confirmed ? 'confirmed' : 'clear'}">
+        ${diag.confirmed ? 'CONFIRMED' : 'NOT CONFIRMED'} — ${diag.evidence}
+      </div>`;
+      btn.disabled = true;
+    });
+  });
+}
+
+function renderRevealButton(results) {
+  const area = document.getElementById('reveal-area');
+  area.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'reveal-btn';
+  btn.textContent = 'Reveal ground truth';
+  btn.addEventListener('click', () => {
+    renderCandidates(results, true);
+    renderScores(scoreResults(results));
+    btn.remove();
+  });
+  area.appendChild(btn);
+}
+
+function renderScores(s) {
+  const accColor = s.accuracy >= 0.8 ? 'var(--green)' : s.accuracy >= 0.6 ? 'var(--amber)' : 'var(--red)';
+  const brierColor = s.brier < 0.4 ? 'var(--green)' : s.brier < 0.8 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('scores-area').innerHTML = `
+    <div class="scores">
+      <h3>Evaluation</h3>
+      <div class="grid">
+        <div class="metric"><div class="label">Accuracy</div>
+          <div class="value" style="color:${accColor}">${s.correct} / ${s.total}</div></div>
+        <div class="metric"><div class="label">Missed incidents</div>
+          <div class="value" style="color:${s.missed ? 'var(--red)' : 'var(--green)'}">${s.missed}</div></div>
+        <div class="metric"><div class="label">False alarms</div>
+          <div class="value" style="color:${s.falseAlarm ? 'var(--amber)' : 'var(--green)'}">${s.falseAlarm} <span style="font-size:11px;color:var(--text-dim)">(${s.hardNegativeMisses} genuine events)</span></div></div>
+        <div class="metric"><div class="label">Brier score</div>
+          <div class="value" style="color:${brierColor}">${s.brier.toFixed(3)}</div></div>
+      </div>
+    </div>`;
+}
+
+// --- Main flow ---
+
+let running = false;
+
+async function runIncidentLab() {
+  if (running) return;
+  running = true;
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('candidates-area').innerHTML = '';
+  document.getElementById('reveal-area').innerHTML = '';
+  document.getElementById('scores-area').innerHTML = '';
+
+  renderPipeline([
+    { label: 'Ingest', state: 'active' },
+    { label: 'Diagnose', state: '' },
+    { label: 'Triage', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Ingesting ${CORPUS.length} runs...`);
+  await sleep(250);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'active' },
+    { label: 'Triage', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Computing cheap diagnostics for ${CORPUS.length} runs...`);
+  await sleep(300);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'active' },
+    { label: 'Display', state: '' },
+  ]);
+
+  const results = await triageAll(CORPUS, (done, total) => {
+    renderStatus(`Triaging with Jev... ${done}/${total}`);
+  });
+
+  results.sort((a, b) => {
+    const aFlag = a.family !== 'clean' ? 1 : 0;
+    const bFlag = b.family !== 'clean' ? 1 : 0;
+    if (aFlag !== bFlag) return bFlag - aFlag;
+    return (b.confidence ?? 0) - (a.confidence ?? 0);
+  });
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'done' },
+    { label: 'Display', state: 'active' },
+  ]);
+  renderStatus('');
+  renderCandidates(results, false);
+  renderRevealButton(results);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'done' },
+    { label: 'Display', state: 'done' },
+  ]);
+
+  document.getElementById('run-btn').disabled = false;
+  running = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// --- FAQ ---
+document.getElementById('faq-btn').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'flex';
+});
+document.getElementById('faq-close').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'none';
+});
+document.getElementById('faq-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+
+// --- Init ---
+async function init() {
+  renderStatus('Loading fixtures...');
+  await loadFixtures();
+  renderStatus('');
+  document.getElementById('run-btn').addEventListener('click', runIncidentLab);
+}
+
+init();
+</script>
+</body>
+</html>

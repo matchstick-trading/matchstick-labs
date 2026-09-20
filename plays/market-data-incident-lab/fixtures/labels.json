@@ -1,0 +1,302 @@
+[
+  {
+    "run_id": "stq-01",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "stq-02",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "stq-03",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "stq-04",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "stq-05",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "stq-06",
+    "incident": {
+      "type": "stale_quote",
+      "description": "The bid/ask quote froze for a long run of consecutive prints while trades kept occurring.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-01",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-02",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-03",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-04",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-05",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "crb-06",
+    "incident": {
+      "type": "crossed_book",
+      "description": "One or more quotes show the bid at or above the ask.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-01",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-02",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-03",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-04",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-05",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "dup-06",
+    "incident": {
+      "type": "duplicate_tick",
+      "description": "One or more trade prints are exact duplicates of the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-01",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-02",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-03",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-04",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-05",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "ooo-06",
+    "incident": {
+      "type": "out_of_order_event",
+      "description": "One or more trade prints arrived timestamped earlier than the print immediately before them.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-01",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-02",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-03",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-04",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-05",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "uas-06",
+    "incident": {
+      "type": "unadjusted_split",
+      "description": "An unexplained large single-print price jump has no recorded corporate-action or news event behind it.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "cln-01",
+    "incident": null
+  },
+  {
+    "run_id": "cln-02",
+    "incident": null
+  },
+  {
+    "run_id": "cln-03",
+    "incident": null
+  },
+  {
+    "run_id": "cln-04",
+    "incident": null
+  },
+  {
+    "run_id": "cln-05",
+    "incident": null
+  },
+  {
+    "run_id": "cln-06",
+    "incident": null
+  },
+  {
+    "run_id": "cln-07",
+    "incident": null
+  },
+  {
+    "run_id": "cln-08",
+    "incident": null
+  },
+  {
+    "run_id": "cln-09",
+    "incident": null
+  },
+  {
+    "run_id": "cln-10",
+    "incident": null
+  },
+  {
+    "run_id": "cln-11",
+    "incident": null
+  },
+  {
+    "run_id": "cln-12",
+    "incident": null
+  },
+  {
+    "run_id": "cln-13",
+    "incident": null
+  },
+  {
+    "run_id": "cln-14",
+    "incident": null
+  },
+  {
+    "run_id": "cln-15",
+    "incident": null
+  }
+]

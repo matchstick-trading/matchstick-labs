@@ -16,6 +16,8 @@ fun to play with and interesting to show.
   Deterministic code searches synthetic fixtures, Jev ranks the shortlist, you reveal ground truth.
 - [`backtest-autopsy`](plays/backtest-autopsy/) — 45 synthetic backtests, five with a seeded bug.
   Deterministic code always computes cheap diagnostics; Jev triages which one check to run next.
+- [`market-data-incident-lab`](plays/market-data-incident-lab/) — 45 synthetic feed runs, five
+  with a seeded incident, five with a genuine news move as a deliberate trap for Jev's triage.
 
 ## Why public
 
