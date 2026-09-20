@@ -110,6 +110,23 @@ header .sub { font-size: 12px; color: var(--text-dim); }
 
 /* Footer */
 footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+
+/* FAQ */
+.faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.faq-btn:hover { border-color: var(--brand); color: var(--brand); }
+.faq-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.faq-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  max-width: 520px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.faq-panel h2 { font: 700 16px var(--mono); margin-bottom: 16px; }
+.faq-panel .faq-item { margin-bottom: 16px; }
+.faq-panel .faq-item dt { font: 600 12px var(--mono); color: var(--brand); margin-bottom: 4px; }
+.faq-panel .faq-item dd { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.faq-close { position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; }
+.faq-close:hover { color: var(--text); }
 </style>
 </head>
 <body>
@@ -119,8 +136,44 @@ footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text
       <h1>Find the Moment</h1>
       <div class="sub">Describe an episode. Code searches. Jev ranks. You verify.</div>
     </div>
-    <div class="sub">Matchstick Labs</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="faq-btn" id="faq-btn" title="What do these metrics mean?">?</button>
+      <div class="sub">Matchstick Labs</div>
+    </div>
   </header>
+
+  <div class="faq-overlay" id="faq-overlay" style="display:none" role="dialog" aria-label="FAQ">
+    <div class="faq-panel" style="position:relative">
+      <button class="faq-close" id="faq-close">&times;</button>
+      <h2>What do these metrics mean?</h2>
+      <dl>
+        <div class="faq-item">
+          <dt>Match %</dt>
+          <dd>Jev's model-output score (0&ndash;100%) for "does this window match the declared episode?" Higher means the model sees stronger similarity. This is not a probability of any market outcome.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Recall@3</dt>
+          <dd>Of the top 3 ranked candidates, how many are true matches? For example, "2 / 3" means 2 of the top 3 results were genuine episodes of that type. Maximum equals the total true matches (up to 3).</dd>
+        </div>
+        <div class="faq-item">
+          <dt>MRR (Mean Reciprocal Rank)</dt>
+          <dd>Where the first true match appears in the ranked list. 1.00 = first result is a match. 0.50 = first match is at position 2. 0.33 = position 3. Measures how quickly you find a relevant result.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Brier Score</dt>
+          <dd>Average squared error between the model's match score and the true label (1 for match, 0 for distractor). Lower is better. Under 0.15 is strong; over 0.30 suggests poor calibration.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>True matches in corpus</dt>
+          <dd>How many of the 40 synthetic windows are seeded as that episode type. This is the ground truth count the ranking is evaluated against.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Source tag (jev / heuristic / fallback)</dt>
+          <dd>"jev" = ranked by the Jev model. "heuristic" = deterministic feature scoring (used when Jev is unavailable). "fallback" = single candidate that failed the API call.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
 
   <div class="prompts" id="prompts">
     <h2>Choose an episode to find</h2>
@@ -579,6 +632,17 @@ async function runQuery(preset, btn) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// --- FAQ ---
+document.getElementById('faq-btn').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'flex';
+});
+document.getElementById('faq-close').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'none';
+});
+document.getElementById('faq-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
 
 // --- Init ---
 async function init() {
