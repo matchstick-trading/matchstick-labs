@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#09090b">
+<title>Backtest Autopsy — Matchstick Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --surface: #18181b; --border: #27272a; --border-light: #3f3f46;
+  --brand: #F1479F; --brand-dim: #F1479F66;
+  --text: #fafafa; --text-muted: #a1a1aa; --text-dim: #71717a;
+  --green: #34d399; --amber: #fbbf24; --red: #f87171;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --sans: system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); padding: 0; }
+button { font: inherit; cursor: pointer; }
+a { color: var(--brand); text-decoration: none; }
+
+.app { max-width: 960px; margin: 0 auto; padding: 16px; }
+
+header { border-bottom: 1px solid var(--border); padding: 12px 0; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; }
+header h1 { font: 600 18px var(--mono); letter-spacing: -0.5px; }
+header .sub { font-size: 12px; color: var(--text-dim); }
+
+.intro { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.intro strong { color: var(--text); }
+
+.run-btn { display: block; margin: 0 auto 24px; padding: 12px 28px; border-radius: 8px;
+  background: var(--brand); border: 1px solid var(--brand); color: #09090b;
+  font: 700 13px var(--mono); transition: opacity 0.15s; }
+.run-btn:hover { opacity: 0.85; }
+.run-btn:disabled { opacity: 0.4; cursor: default; }
+
+.status { text-align: center; padding: 24px; color: var(--text-dim); font-family: var(--mono);
+  font-size: 13px; }
+.status .spinner { display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--border-light); border-top-color: var(--brand);
+  border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pipeline { display: flex; gap: 4px; align-items: center; justify-content: center;
+  margin-bottom: 16px; font-size: 11px; font-family: var(--mono); color: var(--text-dim); }
+.pipeline .step { padding: 4px 10px; border-radius: 4px; background: var(--surface);
+  border: 1px solid var(--border); }
+.pipeline .step.active { border-color: var(--brand); color: var(--brand); }
+.pipeline .step.done { border-color: var(--green); color: var(--green); }
+.pipeline .arrow { color: var(--border-light); }
+
+.candidates { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 16px; }
+@media (min-width: 640px) { .candidates { grid-template-columns: 1fr 1fr; } }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px; transition: border-color 0.15s; position: relative; }
+.card:hover { border-color: var(--border-light); }
+.card.flagged { border-color: var(--brand-dim); }
+.card .id { font: 500 11px var(--mono); color: var(--text-dim); margin-bottom: 8px; }
+.card .verdict-bar { height: 6px; border-radius: 3px; background: var(--border);
+  overflow: hidden; margin-bottom: 6px; }
+.card .verdict-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
+.card .verdict-label { font: 600 13px var(--mono); margin-bottom: 10px; }
+.card .features { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.card .feat { font: 400 10px var(--mono); padding: 2px 6px; border-radius: 3px;
+  background: #27272a; color: var(--text-muted); }
+.card .feat.hot { color: var(--amber); }
+.card .feat .key { color: var(--text-dim); }
+
+.diag-btn { display: block; width: 100%; padding: 6px 10px; border-radius: 6px;
+  background: #27272a; border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 11px var(--mono); text-align: center; transition: all 0.15s; margin-bottom: 8px; }
+.diag-btn:hover { border-color: var(--brand); color: var(--brand); }
+.diag-result { font-size: 11px; font-family: var(--mono); padding: 8px; border-radius: 6px;
+  margin-bottom: 8px; line-height: 1.5; }
+.diag-result.confirmed { background: #f8717122; color: var(--red); }
+.diag-result.clear { background: #34d39922; color: var(--green); }
+
+.truth-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font: 600 10px var(--mono);
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.truth-tag.hit { background: #34d39922; color: var(--green); }
+.truth-tag.miss { background: #f8717122; color: var(--red); }
+.truth-tag.clean-hit { background: #27272a; color: var(--text-dim); }
+
+.scores { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin-top: 16px; }
+.scores h3 { font: 600 13px var(--mono); color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px; }
+.scores .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.scores .metric .label { font: 400 11px var(--mono); color: var(--text-dim); margin-bottom: 2px; }
+.scores .metric .value { font: 700 20px var(--mono); }
+
+.reveal-btn { display: block; margin: 16px auto; padding: 10px 24px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+  font: 500 13px var(--mono); transition: all 0.15s; }
+.reveal-btn:hover { border-color: var(--brand); color: var(--brand); }
+
+.disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
+  margin: 16px auto; text-align: center; }
+footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+
+.faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+.faq-btn:hover { border-color: var(--brand); color: var(--brand); }
+.faq-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px; }
+.faq-panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  max-width: 520px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 24px; }
+.faq-panel h2 { font: 700 16px var(--mono); margin-bottom: 16px; }
+.faq-panel .faq-item { margin-bottom: 16px; }
+.faq-panel .faq-item dt { font: 600 12px var(--mono); color: var(--brand); margin-bottom: 4px; }
+.faq-panel .faq-item dd { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+.faq-close { position: absolute; top: 12px; right: 16px; background: none; border: none;
+  color: var(--text-dim); font-size: 20px; }
+.faq-close:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div>
+      <h1>Backtest Autopsy</h1>
+      <div class="sub">Code finds the facts. Jev triages what's left ambiguous.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="faq-btn" id="faq-btn" title="What do these metrics mean?">?</button>
+      <div class="sub">Matchstick Labs</div>
+    </div>
+  </header>
+
+  <div class="faq-overlay" id="faq-overlay" style="display:none" role="dialog" aria-label="FAQ">
+    <div class="faq-panel" style="position:relative">
+      <button class="faq-close" id="faq-close">&times;</button>
+      <h2>What do these metrics mean?</h2>
+      <dl>
+        <div class="faq-item">
+          <dt>Cheap diagnostics</dt>
+          <dd>Five always-on summary stats computed instantly for every run: how often orders used future-dated data, how many fills landed outside the trading session, the largest unexplained overnight price move, how many events are out of causal order, and how many fills are physically implausible. Each is bucketed none / mild / notable / severe.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Jev's guess</dt>
+          <dd>Jev never sees the raw run — only the five bucketed diagnostics. It picks the most likely failure family (or "clean") from a fixed list and returns a probability for each.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Run diagnostic</dt>
+          <dd>Executes the one deterministic check that can actually confirm Jev's guess — bounds checks, timestamp ordering, or a recorded-adjustment lookup. This is the only step that establishes a fact; Jev's guess is a triage prioritization, not a verdict.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Accuracy</dt>
+          <dd>Share of the 45 runs where Jev's top guess matches the family actually seeded into that run (or correctly says "clean").</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Missed / False alarms</dt>
+          <dd>Missed = a real failure that Jev called clean. False alarm = a clean run that Jev flagged. Both are visible in "Run diagnostic" too — the deterministic check will not confirm a false alarm, and will still catch a missed failure if you spot-check a run Jev called clean.</dd>
+        </div>
+        <div class="faq-item">
+          <dt>Brier score</dt>
+          <dd>Average squared error between Jev's full probability vector and the true one-hot label across all six classes. Lower is better; a well-calibrated 6-class guess scores well below 0.5.</dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="intro">
+    <strong>45 synthetic backtest runs.</strong> Five have a structurally real bug seeded in —
+    lookahead leakage, a timezone offset, a bad corporate-action adjustment, an event-ordering
+    violation, or an impossible fill — the rest are clean. Deterministic code always computes five
+    cheap summary stats per run. Jev looks only at those stats and guesses which failure family is
+    most likely, before anyone pays to run the one check that can actually confirm it.
+  </div>
+
+  <button class="run-btn" id="run-btn">Run Autopsy</button>
+
+  <div id="pipeline-area"></div>
+  <div id="status-area"></div>
+  <div id="candidates-area"></div>
+  <div id="reveal-area"></div>
+  <div id="scores-area"></div>
+
+  <p class="disclosure">
+    Experimental research output using synthetic fixture data &mdash; no real securities, no real
+    backtests. This demonstrates bounded triage classification over frozen test data, not a
+    production backtest validator. Jev's probabilities are model-output triage scores, not
+    guarantees.
+  </p>
+
+  <footer>
+    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+    &middot; Triaged by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; Synthetic data only
+  </footer>
+</div>
+
+<script type="module">
+// --- Failure taxonomy ---
+const FAMILIES = [
+  'lookahead_leakage',
+  'timezone_mismatch',
+  'bad_corporate_action_adjustment',
+  'event_ordering_violation',
+  'unrealistic_fills',
+];
+const ALL_CLASSES = [...FAMILIES, 'clean'];
+
+const FAMILY_LABELS = {
+  lookahead_leakage: 'Lookahead leakage',
+  timezone_mismatch: 'Timezone mismatch',
+  bad_corporate_action_adjustment: 'Bad corp-action adjustment',
+  event_ordering_violation: 'Event ordering violation',
+  unrealistic_fills: 'Unrealistic fills',
+  clean: 'Clean',
+};
+
+// --- Deterministic confirming diagnostics (mirror fixtures/generate.mjs injections) ---
+
+const CHECKERS = {
+  lookahead_leakage(run) {
+    const hits = run.orders.filter(o => o.feature_asof_offset_bars > 0);
+    return hits.length
+      ? { confirmed: true, evidence: `${hits.length}/${run.orders.length} orders used feature data ${hits[0].feature_asof_offset_bars} bar(s) ahead of the decision (e.g. ${hits[0].id}).` }
+      : { confirmed: false, evidence: 'No order used future-dated feature data.' };
+  },
+  timezone_mismatch(run) {
+    const outside = run.orders.filter(o => o.fill_local_hour < 9.0 || o.fill_local_hour > 16.5);
+    const confirmed = outside.length >= Math.ceil(run.orders.length * 0.75);
+    return confirmed
+      ? { confirmed: true, evidence: `${outside.length}/${run.orders.length} fills landed outside the 09:30–16:00 session window — consistent with a timezone offset, not noise.` }
+      : { confirmed: false, evidence: `${outside.length}/${run.orders.length} fills outside session — not enough to confirm a systematic offset.` };
+  },
+  bad_corporate_action_adjustment(run) {
+    let maxRet = 0, maxIdx = -1;
+    for (let i = 1; i < run.bars.length; i++) {
+      const r = Math.abs(run.bars[i].o - run.bars[i - 1].c) / run.bars[i - 1].c;
+      if (r > maxRet) { maxRet = r; maxIdx = i; }
+    }
+    const recorded = run.corporate_actions.some(a => a.bar_index === maxIdx && a.recorded_factor != null);
+    const confirmed = maxRet >= 0.15 && !recorded;
+    return confirmed
+      ? { confirmed: true, evidence: `Bar #${maxIdx} shows a ${(maxRet * 100).toFixed(0)}% overnight move with no recorded adjustment factor.` }
+      : { confirmed: false, evidence: 'No unexplained overnight discontinuity found.' };
+  },
+  event_ordering_violation(run) {
+    const hits = run.orders.filter(o => o.t_fill < o.t_submit || o.t_submit < o.t_signal);
+    return hits.length
+      ? { confirmed: true, evidence: `${hits.length} order(s) recorded out of causal order (e.g. ${hits[0].id}).` }
+      : { confirmed: false, evidence: 'All orders follow signal → submit → fill order.' };
+  },
+  unrealistic_fills(run) {
+    const hits = run.orders.filter(o => {
+      const bar = run.bars[o.bar_index];
+      return o.fill_price < bar.l || o.fill_price > bar.h || o.fill_qty > bar.v;
+    });
+    return hits.length
+      ? { confirmed: true, evidence: `${hits[0].id} filled ${hits[0].fill_qty.toLocaleString()} sh at $${hits[0].fill_price}, outside its bar's price range or traded volume.` }
+      : { confirmed: false, evidence: "All fills sit within their bar's price range and volume." };
+  },
+};
+
+function runDiagnostic(run, predictedFamily) {
+  if (predictedFamily === 'clean') {
+    for (const fam of FAMILIES) {
+      const r = CHECKERS[fam](run);
+      if (r.confirmed) return { family: fam, ...r };
+    }
+    return { family: null, confirmed: false, evidence: 'Spot-checked all five diagnostics — none confirm a violation.' };
+  }
+  return { family: predictedFamily, ...CHECKERS[predictedFamily](run) };
+}
+
+// --- Load fixtures ---
+let CORPUS = [];
+let LABELS = {};
+
+async function loadFixtures() {
+  const [corpusRes, labelsRes] = await Promise.all([
+    fetch('fixtures/corpus.json'),
+    fetch('fixtures/labels.json'),
+  ]);
+  CORPUS = await corpusRes.json();
+  const labelsArr = await labelsRes.json();
+  for (const l of labelsArr) LABELS[l.run_id] = l.failure ? l.failure.type : 'clean';
+}
+
+// --- Jev triage ---
+
+const AUTOPSY_ENDPOINT = 'https://jev.matchstick.trading/api/autopsy';
+
+async function triageOne(run) {
+  const state = { ...run.computed };
+  delete state._raw;
+  try {
+    const res = await fetch(AUTOPSY_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+    }
+    return { run, ...heuristicGuess(run), source: 'heuristic' };
+  } catch {
+    return { run, ...heuristicGuess(run), source: 'heuristic' };
+  }
+}
+
+// Deterministic fallback if Jev is unreachable: pick the single hottest bucket.
+function heuristicGuess(run) {
+  const order = { none: 0, mild: 1, notable: 2, severe: 3 };
+  const map = {
+    lookahead_leakage: run.computed.future_asof_rate,
+    timezone_mismatch: run.computed.session_offset,
+    bad_corporate_action_adjustment: run.computed.price_discontinuity,
+    event_ordering_violation: run.computed.causality_violations,
+    unrealistic_fills: run.computed.fill_implausibility,
+  };
+  let best = 'clean', bestScore = 0;
+  for (const [fam, bucket] of Object.entries(map)) {
+    if (order[bucket] > bestScore) { best = fam; bestScore = order[bucket]; }
+  }
+  const confidence = bestScore === 0 ? 0.6 : Math.min(0.9, 0.4 + bestScore * 0.15);
+  const probs = Object.fromEntries(ALL_CLASSES.map(c => [c, c === best ? confidence : (1 - confidence) / (ALL_CLASSES.length - 1)]));
+  return { family: best, probabilities: probs, confidence };
+}
+
+async function triageAll(runs, onProgress) {
+  const results = [];
+  const batchSize = 6;
+  for (let i = 0; i < runs.length; i += batchSize) {
+    const batch = runs.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(triageOne));
+    results.push(...batchResults);
+    onProgress(results.length, runs.length);
+  }
+  return results;
+}
+
+// --- Scoring ---
+
+function scoreResults(results) {
+  let correct = 0, missed = 0, falseAlarm = 0, brierSum = 0;
+  for (const r of results) {
+    const truth = LABELS[r.run.id];
+    if (r.family === truth) correct++;
+    if (truth !== 'clean' && r.family === 'clean') missed++;
+    if (truth === 'clean' && r.family !== 'clean') falseAlarm++;
+
+    let sq = 0;
+    for (const c of ALL_CLASSES) {
+      const p = r.probabilities?.[c] ?? (c === r.family ? 1 : 0);
+      const y = c === truth ? 1 : 0;
+      sq += (p - y) ** 2;
+    }
+    brierSum += sq;
+  }
+  return {
+    accuracy: correct / results.length,
+    correct,
+    total: results.length,
+    missed,
+    falseAlarm,
+    brier: brierSum / results.length,
+  };
+}
+
+// --- UI ---
+
+function renderPipeline(steps) {
+  document.getElementById('pipeline-area').innerHTML = `<div class="pipeline">${
+    steps.map((s, i) => (i > 0 ? '<span class="arrow">→</span>' : '') + `<span class="step ${s.state}">${s.label}</span>`).join('')
+  }</div>`;
+}
+
+function renderStatus(msg) {
+  document.getElementById('status-area').innerHTML = msg
+    ? `<div class="status"><span class="spinner"></span>${msg}</div>` : '';
+}
+
+function renderCandidates(results, revealed) {
+  const area = document.getElementById('candidates-area');
+  let html = '<div class="candidates">';
+  for (const r of results) {
+    const pct = Math.round((r.confidence ?? r.probabilities?.[r.family] ?? 0) * 100);
+    const color = r.family === 'clean' ? 'var(--text-dim)' : (pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)');
+    const flagged = r.family !== 'clean';
+
+    const c = r.run.computed;
+    const feats = [
+      ['future asof', c.future_asof_rate],
+      ['session offset', c.session_offset],
+      ['price discontinuity', c.price_discontinuity],
+      ['causality', c.causality_violations],
+      ['fill plausibility', c.fill_implausibility],
+    ];
+    const featHtml = feats.map(([k, v]) =>
+      `<span class="feat ${v === 'severe' || v === 'notable' ? 'hot' : ''}"><span class="key">${k}:</span> ${v}</span>`
+    ).join('');
+
+    let truthHtml = '';
+    if (revealed) {
+      const truth = LABELS[r.run.id];
+      if (truth === r.family) {
+        truthHtml = `<span class="truth-tag ${truth === 'clean' ? 'clean-hit' : 'hit'}">${truth === 'clean' ? 'correctly clean' : 'confirmed match'}</span>`;
+      } else {
+        truthHtml = `<span class="truth-tag miss">actually: ${FAMILY_LABELS[truth]}</span>`;
+      }
+    }
+
+    html += `
+      <div class="card ${flagged ? 'flagged' : ''}" data-id="${r.run.id}">
+        <div class="id">${r.run.id} · ${r.source}</div>
+        <div class="verdict-bar"><div class="verdict-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="verdict-label" style="color:${color}">${FAMILY_LABELS[r.family] ?? r.family} · ${pct}%</div>
+        <div class="features">${featHtml}</div>
+        <button class="diag-btn" data-action="diagnose">${flagged ? 'Run diagnostic' : 'Spot-check anyway'}</button>
+        <div class="diag-out"></div>
+        ${truthHtml}
+      </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+
+  area.querySelectorAll('[data-action="diagnose"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('.card');
+      const id = card.dataset.id;
+      const result = results.find(r => r.run.id === id);
+      const diag = runDiagnostic(result.run, result.family);
+      const out = card.querySelector('.diag-out');
+      out.innerHTML = `<div class="diag-result ${diag.confirmed ? 'confirmed' : 'clear'}">
+        ${diag.confirmed ? 'CONFIRMED' : 'NOT CONFIRMED'} — ${diag.evidence}
+      </div>`;
+      btn.disabled = true;
+    });
+  });
+}
+
+function renderRevealButton(results) {
+  const area = document.getElementById('reveal-area');
+  area.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'reveal-btn';
+  btn.textContent = 'Reveal ground truth';
+  btn.addEventListener('click', () => {
+    renderCandidates(results, true);
+    renderScores(scoreResults(results));
+    btn.remove();
+  });
+  area.appendChild(btn);
+}
+
+function renderScores(s) {
+  const accColor = s.accuracy >= 0.8 ? 'var(--green)' : s.accuracy >= 0.6 ? 'var(--amber)' : 'var(--red)';
+  const brierColor = s.brier < 0.4 ? 'var(--green)' : s.brier < 0.8 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('scores-area').innerHTML = `
+    <div class="scores">
+      <h3>Evaluation</h3>
+      <div class="grid">
+        <div class="metric"><div class="label">Accuracy</div>
+          <div class="value" style="color:${accColor}">${s.correct} / ${s.total}</div></div>
+        <div class="metric"><div class="label">Missed failures</div>
+          <div class="value" style="color:${s.missed ? 'var(--red)' : 'var(--green)'}">${s.missed}</div></div>
+        <div class="metric"><div class="label">False alarms</div>
+          <div class="value" style="color:${s.falseAlarm ? 'var(--amber)' : 'var(--green)'}">${s.falseAlarm}</div></div>
+        <div class="metric"><div class="label">Brier score</div>
+          <div class="value" style="color:${brierColor}">${s.brier.toFixed(3)}</div></div>
+      </div>
+    </div>`;
+}
+
+// --- Main flow ---
+
+let running = false;
+
+async function runAutopsy() {
+  if (running) return;
+  running = true;
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('candidates-area').innerHTML = '';
+  document.getElementById('reveal-area').innerHTML = '';
+  document.getElementById('scores-area').innerHTML = '';
+
+  renderPipeline([
+    { label: 'Ingest', state: 'active' },
+    { label: 'Diagnose', state: '' },
+    { label: 'Triage', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Ingesting ${CORPUS.length} runs...`);
+  await sleep(250);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'active' },
+    { label: 'Triage', state: '' },
+    { label: 'Display', state: '' },
+  ]);
+  renderStatus(`Computing cheap diagnostics for ${CORPUS.length} runs...`);
+  await sleep(300);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'active' },
+    { label: 'Display', state: '' },
+  ]);
+
+  const results = await triageAll(CORPUS, (done, total) => {
+    renderStatus(`Triaging with Jev... ${done}/${total}`);
+  });
+
+  results.sort((a, b) => {
+    const aFlag = a.family !== 'clean' ? 1 : 0;
+    const bFlag = b.family !== 'clean' ? 1 : 0;
+    if (aFlag !== bFlag) return bFlag - aFlag;
+    return (b.confidence ?? 0) - (a.confidence ?? 0);
+  });
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'done' },
+    { label: 'Display', state: 'active' },
+  ]);
+  renderStatus('');
+  renderCandidates(results, false);
+  renderRevealButton(results);
+
+  renderPipeline([
+    { label: 'Ingest', state: 'done' },
+    { label: 'Diagnose', state: 'done' },
+    { label: 'Triage', state: 'done' },
+    { label: 'Display', state: 'done' },
+  ]);
+
+  document.getElementById('run-btn').disabled = false;
+  running = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// --- FAQ ---
+document.getElementById('faq-btn').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'flex';
+});
+document.getElementById('faq-close').addEventListener('click', () => {
+  document.getElementById('faq-overlay').style.display = 'none';
+});
+document.getElementById('faq-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+});
+
+// --- Init ---
+async function init() {
+  renderStatus('Loading fixtures...');
+  await loadFixtures();
+  renderStatus('');
+  document.getElementById('run-btn').addEventListener('click', runAutopsy);
+}
+
+init();
+</script>
+</body>
+</html>

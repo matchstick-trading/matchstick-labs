@@ -14,6 +14,8 @@ fun to play with and interesting to show.
   book as a ladder. An arcade answer to "what if browsing data felt physical instead of visual?"
 - [`find-the-moment`](plays/find-the-moment/) — describe a market episode in plain language.
   Deterministic code searches synthetic fixtures, Jev ranks the shortlist, you reveal ground truth.
+- [`backtest-autopsy`](plays/backtest-autopsy/) — 45 synthetic backtests, five with a seeded bug.
+  Deterministic code always computes cheap diagnostics; Jev triages which one check to run next.
 
 ## Why public
 

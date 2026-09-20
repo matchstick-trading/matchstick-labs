@@ -1,0 +1,302 @@
+[
+  {
+    "run_id": "lla-01",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "lla-02",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "lla-03",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "lla-04",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "lla-05",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "lla-06",
+    "failure": {
+      "type": "lookahead_leakage",
+      "description": "One or more orders were decided using feature data timestamped after the decision bar closed.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-01",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-02",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-03",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-04",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-05",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "tzm-06",
+    "failure": {
+      "type": "timezone_mismatch",
+      "description": "Fill timestamps are shifted by a consistent multi-hour offset outside the declared trading session.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-01",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-02",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-03",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-04",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-05",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "bca-06",
+    "failure": {
+      "type": "bad_corporate_action_adjustment",
+      "description": "An unexplained large overnight price move has no matching recorded split or dividend factor.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-01",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-02",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-03",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-04",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-05",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "eov-06",
+    "failure": {
+      "type": "event_ordering_violation",
+      "description": "One or more orders record a fill before its submission, or a submission before its signal.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-01",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-02",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-03",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-04",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-05",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "urf-06",
+    "failure": {
+      "type": "unrealistic_fills",
+      "description": "One or more fills sit outside the bar’s high-low range or exceed the bar’s traded volume.",
+      "confidence": "definite"
+    }
+  },
+  {
+    "run_id": "cln-01",
+    "failure": null
+  },
+  {
+    "run_id": "cln-02",
+    "failure": null
+  },
+  {
+    "run_id": "cln-03",
+    "failure": null
+  },
+  {
+    "run_id": "cln-04",
+    "failure": null
+  },
+  {
+    "run_id": "cln-05",
+    "failure": null
+  },
+  {
+    "run_id": "cln-06",
+    "failure": null
+  },
+  {
+    "run_id": "cln-07",
+    "failure": null
+  },
+  {
+    "run_id": "cln-08",
+    "failure": null
+  },
+  {
+    "run_id": "cln-09",
+    "failure": null
+  },
+  {
+    "run_id": "cln-10",
+    "failure": null
+  },
+  {
+    "run_id": "cln-11",
+    "failure": null
+  },
+  {
+    "run_id": "cln-12",
+    "failure": null
+  },
+  {
+    "run_id": "cln-13",
+    "failure": null
+  },
+  {
+    "run_id": "cln-14",
+    "failure": null
+  },
+  {
+    "run_id": "cln-15",
+    "failure": null
+  }
+]
