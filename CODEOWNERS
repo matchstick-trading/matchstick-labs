@@ -1,0 +1,14 @@
+# CODEOWNERS
+# See https://docs.github.com/articles/about-code-owners
+#
+# Order matters: later matching patterns take precedence. Keep the most
+# specific rules last if this file grows.
+
+/.github/            @watthem
+/AGENTS.md           @watthem
+/CLAUDE.md           @watthem
+/SECURITY.md         @watthem
+/package.json        @watthem
+/package-lock.json   @watthem
+/CODEOWNERS          @watthem
+.github/CODEOWNERS   @watthem
