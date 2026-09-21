@@ -192,7 +192,7 @@ footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text
 
   <footer>
     <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
-    &middot; Triaged by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; <span id="footer-source">Triaged by <a href="https://typesafe.ai">TypeSafe Jev</a>, rule baseline when unavailable</span>
     &middot; Synthetic data only
   </footer>
 </div>
@@ -291,6 +291,16 @@ async function loadFixtures() {
 
 const AUTOPSY_ENDPOINT = 'https://jev.matchstick.trading/api/autopsy';
 
+// A 200 response is not automatically a real verdict — validate shape and
+// range before trusting it as Jev output, so a malformed body (unknown
+// family, out-of-range confidence) can't slip through as a genuine result.
+function isValidVerdict(data) {
+  if (!data || typeof data.family !== 'string' || !ALL_CLASSES.includes(data.family)) return false;
+  if (typeof data.confidence !== 'number' || data.confidence < 0 || data.confidence > 1) return false;
+  if (!data.probabilities || typeof data.probabilities !== 'object') return false;
+  return Object.values(data.probabilities).every(p => typeof p === 'number' && p >= 0 && p <= 1);
+}
+
 async function triageOne(run) {
   const state = { ...run.computed };
   delete state._raw;
@@ -302,15 +312,23 @@ async function triageOne(run) {
     });
     if (res.ok) {
       const data = await res.json();
-      return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+      if (isValidVerdict(data)) {
+        return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+      }
+      // 200 with a malformed or out-of-range body — not a real Jev verdict, do not tag as one.
     }
-    return { run, ...heuristicGuess(run), source: 'heuristic' };
   } catch {
-    return { run, ...heuristicGuess(run), source: 'heuristic' };
+    // Jev unreachable for this run.
   }
+  // Rule baseline: use the deterministic hottest-bucket pick, but never carry
+  // its invented confidence/probability vector forward as if it were a real
+  // model judgment.
+  return { run, family: heuristicGuess(run).family, probabilities: null, confidence: null, source: 'rule_baseline' };
 }
 
-// Deterministic fallback if Jev is unreachable: pick the single hottest bucket.
+// Deterministic hottest-bucket pick — the rule baseline's family guess when
+// Jev is unavailable. Keep this computation; only its labeling as a model
+// judgment was the bug.
 function heuristicGuess(run) {
   const order = { none: 0, mild: 1, notable: 2, severe: 3 };
   const map = {
@@ -344,28 +362,40 @@ async function triageAll(runs, onProgress) {
 // --- Scoring ---
 
 function scoreResults(results) {
-  let correct = 0, missed = 0, falseAlarm = 0, brierSum = 0;
+  let correct = 0, missed = 0, falseAlarm = 0;
   for (const r of results) {
     const truth = LABELS[r.run.id];
     if (r.family === truth) correct++;
     if (truth !== 'clean' && r.family === 'clean') missed++;
     if (truth === 'clean' && r.family !== 'clean') falseAlarm++;
+  }
 
+  // Brier score: Jev-sourced rows only. Rule baseline rows carry no real
+  // probability vector and must never be scored as if they were calibrated
+  // model output.
+  const jevResults = results.filter(r => r.source === 'jev');
+  let brierSum = 0;
+  for (const r of jevResults) {
+    const truth = LABELS[r.run.id];
     let sq = 0;
     for (const c of ALL_CLASSES) {
-      const p = r.probabilities?.[c] ?? (c === r.family ? 1 : 0);
+      const p = r.probabilities?.[c] ?? 0;
       const y = c === truth ? 1 : 0;
       sq += (p - y) ** 2;
     }
     brierSum += sq;
   }
+  const brierCount = jevResults.length;
+  const brier = brierCount ? brierSum / brierCount : null;
+
   return {
     accuracy: correct / results.length,
     correct,
     total: results.length,
     missed,
     falseAlarm,
-    brier: brierSum / results.length,
+    brier,
+    brierCount,
   };
 }
 
@@ -377,17 +407,16 @@ function renderPipeline(steps) {
   }</div>`;
 }
 
-function renderStatus(msg) {
+function renderStatus(msg, { spinner = true } = {}) {
   document.getElementById('status-area').innerHTML = msg
-    ? `<div class="status"><span class="spinner"></span>${msg}</div>` : '';
+    ? `<div class="status">${spinner ? '<span class="spinner"></span>' : ''}${msg}</div>` : '';
 }
 
 function renderCandidates(results, revealed) {
   const area = document.getElementById('candidates-area');
   let html = '<div class="candidates">';
   for (const r of results) {
-    const pct = Math.round((r.confidence ?? r.probabilities?.[r.family] ?? 0) * 100);
-    const color = r.family === 'clean' ? 'var(--text-dim)' : (pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)');
+    const isJev = r.source === 'jev';
     const flagged = r.family !== 'clean';
 
     const c = r.run.computed;
@@ -412,11 +441,25 @@ function renderCandidates(results, revealed) {
       }
     }
 
+    // A rule baseline verdict never carries a confidence bar or percentage —
+    // that number would be invented, not a real Jev probability.
+    let verdictBarHtml = '';
+    let verdictLabelHtml;
+    if (isJev) {
+      const pct = Math.round((r.confidence ?? 0) * 100);
+      const color = r.family === 'clean' ? 'var(--text-dim)' : (pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)');
+      verdictBarHtml = `<div class="verdict-bar"><div class="verdict-fill" style="width:${pct}%;background:${color}"></div></div>`;
+      verdictLabelHtml = `<div class="verdict-label" style="color:${color}">Jev &middot; ${FAMILY_LABELS[r.family] ?? r.family} &middot; ${pct}%</div>`;
+    } else {
+      const color = flagged ? 'var(--amber)' : 'var(--text-dim)';
+      verdictLabelHtml = `<div class="verdict-label" style="color:${color}">Rule baseline: ${FAMILY_LABELS[r.family] ?? r.family}</div>`;
+    }
+
     html += `
       <div class="card ${flagged ? 'flagged' : ''}" data-id="${r.run.id}">
-        <div class="id">${r.run.id} · ${r.source}</div>
-        <div class="verdict-bar"><div class="verdict-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="verdict-label" style="color:${color}">${FAMILY_LABELS[r.family] ?? r.family} · ${pct}%</div>
+        <div class="id">${r.run.id} · ${isJev ? 'jev' : 'rule baseline'}</div>
+        ${verdictBarHtml}
+        ${verdictLabelHtml}
         <div class="features">${featHtml}</div>
         <button class="diag-btn" data-action="diagnose">${flagged ? 'Run diagnostic' : 'Spot-check anyway'}</button>
         <div class="diag-out"></div>
@@ -457,7 +500,9 @@ function renderRevealButton(results) {
 
 function renderScores(s) {
   const accColor = s.accuracy >= 0.8 ? 'var(--green)' : s.accuracy >= 0.6 ? 'var(--amber)' : 'var(--red)';
-  const brierColor = s.brier < 0.4 ? 'var(--green)' : s.brier < 0.8 ? 'var(--amber)' : 'var(--red)';
+  const hasBrier = s.brierCount > 0;
+  const brierColor = !hasBrier ? 'var(--text-dim)' : s.brier < 0.4 ? 'var(--green)' : s.brier < 0.8 ? 'var(--amber)' : 'var(--red)';
+  const brierValue = hasBrier ? s.brier.toFixed(3) : 'n/a';
   document.getElementById('scores-area').innerHTML = `
     <div class="scores">
       <h3>Evaluation</h3>
@@ -468,8 +513,8 @@ function renderScores(s) {
           <div class="value" style="color:${s.missed ? 'var(--red)' : 'var(--green)'}">${s.missed}</div></div>
         <div class="metric"><div class="label">False alarms</div>
           <div class="value" style="color:${s.falseAlarm ? 'var(--amber)' : 'var(--green)'}">${s.falseAlarm}</div></div>
-        <div class="metric"><div class="label">Brier score</div>
-          <div class="value" style="color:${brierColor}">${s.brier.toFixed(3)}</div></div>
+        <div class="metric"><div class="label">Brier score (Jev, n=${s.brierCount})</div>
+          <div class="value" style="color:${brierColor}">${brierValue}</div></div>
       </div>
     </div>`;
 }
@@ -512,7 +557,7 @@ async function runAutopsy() {
   ]);
 
   const results = await triageAll(CORPUS, (done, total) => {
-    renderStatus(`Triaging with Jev... ${done}/${total}`);
+    renderStatus(`Triaging... ${done}/${total}`);
   });
 
   results.sort((a, b) => {
@@ -528,7 +573,16 @@ async function runAutopsy() {
     { label: 'Triage', state: 'done' },
     { label: 'Display', state: 'active' },
   ]);
-  renderStatus('');
+
+  // Status line and footer both reflect the actual mix of sources in this
+  // result set, not a static "triaged by Jev" claim.
+  const jevCount = results.filter(r => r.source === 'jev').length;
+  const ruleBaselineCount = results.length - jevCount;
+  const sourceSummary = `Jev ${jevCount} · Rule baseline ${ruleBaselineCount}`;
+  renderStatus(sourceSummary, { spinner: false });
+  const footerSource = document.getElementById('footer-source');
+  if (footerSource) footerSource.textContent = sourceSummary;
+
   renderCandidates(results, false);
   renderRevealButton(results);
 

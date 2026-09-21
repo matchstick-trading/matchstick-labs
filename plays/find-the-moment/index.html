@@ -168,8 +168,8 @@ footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text
           <dd>How many of the 40 synthetic windows are seeded as that episode type. This is the ground truth count the ranking is evaluated against.</dd>
         </div>
         <div class="faq-item">
-          <dt>Source tag (jev / heuristic / fallback)</dt>
-          <dd>"jev" = ranked by the Jev model. "heuristic" = deterministic feature scoring (used when Jev is unavailable). "fallback" = single candidate that failed the API call.</dd>
+          <dt>Source tag (jev / deterministic / unavailable)</dt>
+          <dd>"jev" = ranked by the Jev model, a real match score. "deterministic" = the deterministic baseline ranking used only when Jev is unavailable for every candidate; its score is derived from rank position, not a match probability. "unavailable" = Jev did not return a usable score for this specific candidate.</dd>
         </div>
       </dl>
     </div>
@@ -193,7 +193,7 @@ footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text
 
   <footer>
     <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
-    &middot; Ranked by <a href="https://typesafe.ai">TypeSafe Jev</a>
+    &middot; <span id="footer-source">Ranked by <a href="https://typesafe.ai">TypeSafe Jev</a>, deterministic baseline when unavailable</span>
     &middot; Synthetic data only
   </footer>
 </div>
@@ -347,26 +347,38 @@ async function rankWithJev(candidates, preset) {
 
       if (res.ok) {
         const data = await res.json();
-        results.push({ window: w, matchScore: data.score ?? 0.5, source: 'jev' });
+        if (typeof data.score === 'number' && data.score >= 0 && data.score <= 1) {
+          results.push({ window: w, matchScore: data.score, source: 'jev' });
+        } else {
+          // 200 with a malformed body — not a real Jev score, do not tag as one.
+          results.push({ window: w, matchScore: null, source: 'unavailable' });
+        }
       } else {
-        results.push({ window: w, matchScore: 0.5, source: 'fallback' });
+        results.push({ window: w, matchScore: null, source: 'unavailable' });
       }
     } catch {
-      // Jev unavailable — use deterministic heuristic as fallback
-      results.push({ window: w, matchScore: 0.5, source: 'fallback' });
+      // Jev unreachable for this candidate.
+      results.push({ window: w, matchScore: null, source: 'unavailable' });
     }
   }
 
-  results.sort((a, b) => b.matchScore - a.matchScore);
+  // Real Jev scores rank first (highest match first); candidates Jev could not
+  // score are never mixed into that ranking — they always sort last.
+  results.sort((a, b) => {
+    if (a.source === 'jev' && b.source === 'jev') return b.matchScore - a.matchScore;
+    if (a.source === 'jev') return -1;
+    if (b.source === 'jev') return 1;
+    return 0;
+  });
   return results;
 }
 
-// --- Deterministic fallback ranking ---
+// --- Deterministic baseline ranking (used only when Jev scored nothing) ---
 function rankDeterministic(candidates, preset) {
   return searchAndFilter(preset).map((w, i) => ({
     window: w,
     matchScore: Math.max(0.1, 1 - i * 0.07),
-    source: 'heuristic',
+    source: 'deterministic',
   }));
 }
 
@@ -375,19 +387,27 @@ function rankDeterministic(candidates, preset) {
 function scoreResults(ranked, preset) {
   const targetType = preset.target_type;
 
-  // Check which of top-3 are true matches
-  const top3 = ranked.slice(0, 3);
+  // Ranking metrics (Recall@3, MRR) count only rows Jev actually scored.
+  // `ranked` sorts Jev-scored rows first and unavailable rows last in their
+  // original candidate order, not by any real relevance signal — mixing them
+  // in would let an unavailable row "win" a rank slot by coincidence during
+  // a partial outage.
+  const jevRows = ranked.filter(r => r.source === 'jev');
+
+  const top3 = jevRows.slice(0, 3);
   const top3Matches = top3.filter(r => {
     const label = LABELS[r.window.id];
     return label?.episodes?.some(e => e.type === targetType);
   });
 
   const recall3 = top3Matches.length;
+  const rankedCount = jevRows.length;
 
-  // Mean reciprocal rank
+  // Mean reciprocal rank — over Jev-scored rows only, indexed within that
+  // subset so an unavailable row's position never inflates the rank.
   let mrr = 0;
-  for (let i = 0; i < ranked.length; i++) {
-    const label = LABELS[ranked[i].window.id];
+  for (let i = 0; i < jevRows.length; i++) {
+    const label = LABELS[jevRows[i].window.id];
     if (label?.episodes?.some(e => e.type === targetType)) {
       mrr = 1 / (i + 1);
       break;
@@ -399,16 +419,19 @@ function scoreResults(ranked, preset) {
     l.episodes?.some(e => e.type === targetType)
   ).length;
 
-  // Brier score (binary: did we rank matches above non-matches?)
+  // Brier score (binary: did we rank matches above non-matches?) — Jev-scored
+  // rows only. A deterministic or unavailable row has no real match
+  // probability, so it cannot be scored as one.
   let brierSum = 0;
-  for (const r of ranked) {
+  for (const r of jevRows) {
     const label = LABELS[r.window.id];
     const isMatch = label?.episodes?.some(e => e.type === targetType) ? 1 : 0;
     brierSum += (r.matchScore - isMatch) ** 2;
   }
-  const brier = brierSum / ranked.length;
+  const brier = jevRows.length ? brierSum / jevRows.length : null;
+  const brierCount = jevRows.length;
 
-  return { recall3, totalMatches, mrr, brier, topMatch: top3Matches.length > 0 };
+  return { recall3, rankedCount, totalMatches, mrr, brier, brierCount, topMatch: top3Matches.length > 0 };
 }
 
 // --- UI ---
@@ -434,9 +457,9 @@ function renderPipeline(steps) {
   }</div>`;
 }
 
-function renderStatus(msg) {
+function renderStatus(msg, { spinner = true } = {}) {
   document.getElementById('status-area').innerHTML = msg
-    ? `<div class="status"><span class="spinner"></span>${msg}</div>`
+    ? `<div class="status">${spinner ? '<span class="spinner"></span>' : ''}${msg}</div>`
     : '';
 }
 
@@ -449,8 +472,6 @@ function renderCandidates(ranked, revealed) {
     const r = ranked[i];
     const w = r.window;
     const f = w.computed;
-    const pct = Math.round(r.matchScore * 100);
-    const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)';
 
     // Mini chart
     const chartHtml = renderMiniChart(w.bars);
@@ -473,12 +494,30 @@ function renderCandidates(ranked, revealed) {
       .map(([k, v]) => `<span class="feat"><span class="key">${k.replace(/_/g, ' ')}:</span> ${v}</span>`)
       .join('');
 
+    // Primary label always states the actual source. A rank-derived
+    // deterministic-baseline score or an unavailable Jev call is never
+    // rendered as a "% match" — only a real Jev score earns that wording.
+    let barHtml = '';
+    let labelHtml;
+    if (r.source === 'jev') {
+      const pct = Math.round(r.matchScore * 100);
+      const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)';
+      barHtml = `<div class="match-bar"><div class="match-fill" style="width:${pct}%;background:${color}"></div></div>`;
+      labelHtml = `<div class="match-label" style="color:${color}">Jev &middot; ${pct}% match</div>`;
+    } else if (r.source === 'deterministic') {
+      const pct = Math.round(r.matchScore * 100);
+      barHtml = `<div class="match-bar"><div class="match-fill" style="width:${pct}%;background:var(--text-dim)"></div></div>`;
+      labelHtml = `<div class="match-label" style="color:var(--text-muted)">Deterministic baseline &middot; rank #${i + 1}</div>`;
+    } else {
+      labelHtml = `<div class="match-label" style="color:var(--text-dim)">Jev score unavailable</div>`;
+    }
+
     html += `
       <div class="card">
         <span class="rank">#${i + 1}</span>
         <div class="id">${w.id} · ${r.source}</div>
-        <div class="match-bar"><div class="match-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="match-label" style="color:${color}">${pct}% match</div>
+        ${barHtml}
+        ${labelHtml}
         ${chartHtml}
         <div class="features">${featureEntries}</div>
         ${truthHtml}
@@ -522,23 +561,25 @@ function renderScores(scores) {
   const area = document.getElementById('scores-area');
   const r3Color = scores.recall3 >= 3 ? 'var(--green)' : scores.recall3 >= 1 ? 'var(--amber)' : 'var(--red)';
   const mrrColor = scores.mrr >= 0.5 ? 'var(--green)' : scores.mrr > 0 ? 'var(--amber)' : 'var(--red)';
-  const brierColor = scores.brier < 0.15 ? 'var(--green)' : scores.brier < 0.3 ? 'var(--amber)' : 'var(--red)';
+  const hasBrier = scores.brierCount > 0;
+  const brierColor = !hasBrier ? 'var(--text-dim)' : scores.brier < 0.15 ? 'var(--green)' : scores.brier < 0.3 ? 'var(--amber)' : 'var(--red)';
+  const brierValue = hasBrier ? scores.brier.toFixed(3) : 'n/a';
 
   area.innerHTML = `
     <div class="scores">
       <h3>Evaluation</h3>
       <div class="grid">
         <div class="metric">
-          <div class="label">Recall@3</div>
-          <div class="value" style="color:${r3Color}">${scores.recall3} / ${Math.min(3, scores.totalMatches)}</div>
+          <div class="label">Recall@3 (Jev, n=${scores.rankedCount})</div>
+          <div class="value" style="color:${r3Color}">${scores.recall3} / ${Math.min(3, scores.rankedCount, scores.totalMatches)}</div>
         </div>
         <div class="metric">
-          <div class="label">MRR</div>
-          <div class="value" style="color:${mrrColor}">${scores.mrr.toFixed(2)}</div>
+          <div class="label">MRR (Jev, n=${scores.rankedCount})</div>
+          <div class="value" style="color:${mrrColor}">${scores.rankedCount ? scores.mrr.toFixed(2) : 'n/a'}</div>
         </div>
         <div class="metric">
-          <div class="label">Brier score</div>
-          <div class="value" style="color:${brierColor}">${scores.brier.toFixed(3)}</div>
+          <div class="label">Brier score (Jev, n=${scores.brierCount})</div>
+          <div class="value" style="color:${brierColor}">${brierValue}</div>
         </div>
         <div class="metric">
           <div class="label">True matches in corpus</div>
@@ -594,18 +635,19 @@ async function runQuery(preset, btn) {
     { label: 'Rank', state: 'active' },
     { label: 'Display', state: '' },
   ]);
-  renderStatus(`Ranking ${candidates.length} candidates with Jev...`);
+  renderStatus(`Ranking ${candidates.length} candidates...`);
 
   let ranked;
   try {
     ranked = await rankWithJev(candidates, preset);
   } catch {
-    // Fallback to deterministic ranking if Jev is unavailable
+    // Jev entirely unreachable — use the deterministic baseline ranking.
     ranked = rankDeterministic(candidates, preset);
   }
 
-  // If all results came back as fallback, try deterministic
-  if (ranked.every(r => r.source === 'fallback')) {
+  // If Jev never returned a usable score for any candidate, use the
+  // deterministic baseline ranking instead of a list of "unavailable" rows.
+  if (ranked.every(r => r.source === 'unavailable')) {
     ranked = rankDeterministic(candidates, preset);
   }
 
@@ -616,7 +658,25 @@ async function runQuery(preset, btn) {
     { label: 'Rank', state: 'done' },
     { label: 'Display', state: 'active' },
   ]);
-  renderStatus('');
+
+  // Status line and footer both reflect the actual mix of sources in this
+  // result set, not a static "ranked by Jev" claim.
+  const jevCount = ranked.filter(r => r.source === 'jev').length;
+  const deterministicCount = ranked.filter(r => r.source === 'deterministic').length;
+  const unavailableCount = ranked.filter(r => r.source === 'unavailable').length;
+  let sourceSummary;
+  if (ranked.length === 0) {
+    sourceSummary = 'No candidates matched the filters';
+  } else if (deterministicCount === ranked.length) {
+    sourceSummary = `Deterministic baseline ranked all ${ranked.length} — Jev unavailable`;
+  } else if (jevCount === ranked.length) {
+    sourceSummary = `Jev ranked all ${ranked.length}`;
+  } else {
+    sourceSummary = `Jev ${jevCount} · unavailable ${unavailableCount}`;
+  }
+  renderStatus(sourceSummary, { spinner: false });
+  const footerSource = document.getElementById('footer-source');
+  if (footerSource) footerSource.textContent = sourceSummary;
 
   renderCandidates(ranked, false);
   renderRevealButton(ranked, preset);
