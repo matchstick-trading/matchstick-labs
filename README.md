@@ -26,6 +26,11 @@ fun to play with and interesting to show.
   an order from plain English, code computes the risk, Jev judges intent and ambiguity, and code —
   not Jev — decides ready, review, or blocked.
 
+## Service status
+
+[STATUS.md](STATUS.md) — manually maintained, hosted here specifically so it still loads if
+Cloudflare (which hosts the site and the Jev API) has a problem.
+
 ## Why public
 
 These are meant to be played, shared, and reacted to — not filed away. If one of these ideas ever
