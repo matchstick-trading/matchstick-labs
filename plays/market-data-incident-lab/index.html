@@ -391,7 +391,15 @@ async function triageOne(run) {
     if (res.ok) {
       const data = await res.json();
       if (typeof data.family === 'string' && data.probabilities && typeof data.confidence === 'number') {
-        return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+        const result = { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
+        // Disclose a worker-side cache hit (vaults.DEV-2026-09-278) -- a cache hit is still a
+        // real, already-computed Jev verdict, so it stays source: 'jev' for scoring purposes;
+        // only the display label changes.
+        if (data.cache === 'hit') {
+          result.cached = true;
+          result.generatedAt = data.generatedAt;
+        }
+        return result;
       }
       // 200 with a malformed body — not a real Jev verdict, do not tag as one.
     }
@@ -494,6 +502,13 @@ function renderStatus(msg, { spinner = true } = {}) {
     ? `<div class="status">${spinner ? '<span class="spinner"></span>' : ''}${msg}</div>` : '';
 }
 
+// Formats a worker-supplied `generatedAt` ISO timestamp as a plain date for the
+// "Jev (cached, {date})" disclosure label. Never invents a date -- only called
+// with a real value that came from the worker response (vaults.DEV-2026-09-278).
+function formatCacheDate(generatedAt) {
+  return typeof generatedAt === 'string' ? generatedAt.slice(0, 10) : 'unknown date';
+}
+
 function renderCandidates(results, revealed) {
   const area = document.getElementById('candidates-area');
   let html = '<div class="candidates">';
@@ -534,7 +549,8 @@ function renderCandidates(results, revealed) {
       const pct = Math.round((r.confidence ?? 0) * 100);
       const color = r.family === 'clean' ? 'var(--text-dim)' : (pct >= 70 ? 'var(--red)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)');
       verdictBarHtml = `<div class="verdict-bar"><div class="verdict-fill" style="width:${pct}%;background:${color}"></div></div>`;
-      verdictLabelHtml = `<div class="verdict-label" style="color:${color}">Jev &middot; ${FAMILY_LABELS[r.family] ?? r.family} &middot; ${pct}%</div>`;
+      const jevLabel = r.cached ? `Jev (cached, ${formatCacheDate(r.generatedAt)})` : 'Jev';
+      verdictLabelHtml = `<div class="verdict-label" style="color:${color}">${jevLabel} &middot; ${FAMILY_LABELS[r.family] ?? r.family} &middot; ${pct}%</div>`;
     } else {
       const color = flagged ? 'var(--amber)' : 'var(--text-dim)';
       verdictLabelHtml = `<div class="verdict-label" style="color:${color}">Rule baseline: ${FAMILY_LABELS[r.family] ?? r.family}</div>`;
