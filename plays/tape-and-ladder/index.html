@@ -101,6 +101,26 @@
   .lbInit{flex:1;color:var(--phosphor)}
   .lbScore{color:var(--paper);font-weight:600;text-align:right}
   .lbEmpty{color:var(--muted);padding:6px 0}
+  /* Service notice (spec: ServiceNotice component, Level 1 + Level 2) */
+  .service-notice{background:#182a40;border:1px solid var(--rule);border-radius:6px;padding:10px 12px;margin-top:10px;text-align:left}
+  .service-notice .sn-headline{display:flex;align-items:center;gap:8px;font:600 12px var(--mono);color:var(--amber);margin-bottom:5px}
+  .service-notice .sn-cause,.service-notice .sn-still-works{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:3px}
+  .service-notice details.sn-details{margin-top:8px}
+  .service-notice details.sn-details summary{cursor:pointer;font:600 10px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .service-notice details.sn-details summary:hover{color:var(--paper)}
+  .service-notice .sn-detail-grid{margin-top:6px;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;font-family:var(--mono)}
+  .service-notice .sn-detail-grid dt{color:var(--muted)}
+  .service-notice .sn-detail-grid dd{color:var(--paper);margin:0}
+  /* Level 3 footer */
+  footer.labs-footer{display:block;font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6}
+  footer.labs-footer a,.service-notice a{color:var(--phosphor)}
+  .labs-footer .lf-founder{margin-bottom:4px}
+  .labs-footer .lf-row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .labs-footer .lf-links a{margin:0 3px}
+  .labs-footer details.footer-support-note{margin-top:6px}
+  .labs-footer details.footer-support-note summary{cursor:pointer;font-size:10px;color:var(--muted)}
+  .labs-footer details.footer-support-note summary:hover{color:var(--paper)}
+  .labs-footer details.footer-support-note p{max-width:480px;margin:6px 0 0;font-size:10px;line-height:1.5;color:var(--muted)}
   .touchControls{display:none}
   @media(max-width:1000px){body{padding:20px}.panels{grid-template-columns:minmax(0,1fr) 230px}.stat{padding:13px 15px}.stat b{font-size:22px}.headerActions button{font-size:12px;padding:8px 10px}}
   @media(max-width:760px){
@@ -165,7 +185,22 @@
     </section>
   </div>
   <div class="bottomBar"><div class="controlsLegend"><span><kbd>Space</kbd> / <kbd>↑</kbd> jump · hold for height</span><span><kbd>W</kbd> <kbd>S</kbd> move ladder</span><span><kbd>P</kbd> pause</span></div><button id="regen" class="ghost" type="button">New run <kbd>R</kbd></button></div>
-  <footer><span>Matchstick Labs · An arcade experiment</span><span>Synthetic prices. No real trades.</span></footer>
+  <footer class="labs-footer">
+    <div class="lf-founder">Built by Matthew Hendricks, an independent developer exploring reproducible market-data tools.</div>
+    <div class="lf-row">
+      <span><a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a> &middot; An arcade experiment</span>
+      <span>Synthetic prices. No real trades.</span>
+    </div>
+    <div class="lf-links">
+      <a href="mailto:hello@matchstick.trading">Contact</a>
+      &middot; <a href="https://buymeacoffee.com/watthem">Support these experiments</a>
+      &middot; <a href="https://github.com/matchstick-trading/matchstick-labs/blob/main/STATUS.md">Service status</a>
+    </div>
+    <details class="footer-support-note">
+      <summary>What does support mean?</summary>
+      <p>Support is optional and does not buy uptime, access, priority, or a particular result.</p>
+    </details>
+  </footer>
 </div>
 <div id="helpOverlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
   <div class="overlayCard">
@@ -190,6 +225,7 @@
     <div class="goForm"><label for="initialsInput">Leaderboard initials</label><input id="initialsInput" maxlength="3" autocomplete="off" spellcheck="false" value=""></div>
     <div class="goActions"><button id="goSubmit" class="ghost" type="button">Submit score</button></div>
     <div class="lbHead"><h3>Leaderboard</h3><span id="lbSource"></span></div><ul id="lbList"></ul>
+    <div id="lbNotice"></div>
   </div>
 </div>
 <div id="touchControls" class="touchControls" aria-label="Game controls" aria-hidden="true">
@@ -2539,6 +2575,33 @@
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   }
+
+  // --- Service status (spec: ServiceNotice Level 1 + Level 2) ---
+  // The shared worker infrastructure does not yet emit real reason codes
+  // (increment 6 of wiki/service-degradation-implementation-audit.md is not
+  // started), so a degraded notice always reports UNKNOWN honestly rather
+  // than inventing a more specific one.
+  var SERVICE_REASON_CODE = "UNKNOWN";
+  // Set by the owner once a real review date is known. Left null until then —
+  // never rendered as a placeholder.
+  var NEXT_REVIEW_AT = null;
+  function renderServiceNotice(opts){
+    var rows = [
+      ["Affected service", opts.service],
+      ["Reason code", SERVICE_REASON_CODE],
+      ["Detected", opts.detectedAt]
+    ];
+    if (NEXT_REVIEW_AT) rows.push(["Next review", NEXT_REVIEW_AT]);
+    var dl = rows.map(function(r){ return "<dt>"+r[0]+"</dt><dd>"+r[1]+"</dd>"; }).join("");
+    return '<div class="service-notice">'
+      + '<div class="sn-headline">&#9888; '+opts.headline+'</div>'
+      + '<div class="sn-cause">'+opts.cause+'</div>'
+      + '<div class="sn-still-works">'+opts.stillWorks+'</div>'
+      + (opts.actionText ? '<div class="sn-still-works">'+opts.actionText+'</div>' : '')
+      + '<details class="sn-details"><summary>Service details</summary><dl class="sn-detail-grid">'+dl+'</dl></details>'
+      + '</div>';
+  }
+
   function renderLeaderboard(list, isLocal){
     var el = document.getElementById("lbList");
     if (!list || !list.length){ el.innerHTML = '<li class="lbEmpty">No scores yet.</li>'; return; }
@@ -2546,6 +2609,17 @@
       return '<li><span class="lbRank">'+(i+1)+'</span><span class="lbInit">'+escapeHtml(r.initials)+'</span><span class="lbScore">'+r.score+'</span></li>';
     }).join("");
     document.getElementById("lbSource").textContent = isLocal ? "LOCAL (offline)" : "GLOBAL";
+    var noticeEl = document.getElementById("lbNotice");
+    if (noticeEl) {
+      noticeEl.innerHTML = isLocal ? renderServiceNotice({
+        headline: "Leaderboard is local only",
+        cause: "This browser could not reach the global leaderboard service.",
+        stillWorks: "Your score is saved on this device and shown above.",
+        actionText: "Your next run will try submitting to the global leaderboard again automatically.",
+        service: "api",
+        detectedAt: new Date().toISOString()
+      }) : "";
+    }
   }
 
   // M6: the leaderboard submits hwmTicks (the run's high-water-mark PnL), not the
@@ -2555,6 +2629,7 @@
     document.getElementById("goMessage").textContent = msg;
     document.getElementById("lbSource").textContent = "";
     document.getElementById("lbList").innerHTML = "";
+    document.getElementById("lbNotice").innerHTML = "";
     document.getElementById("gameOverOverlay").hidden = false;
     var input = document.getElementById("initialsInput");
     input.value = "";
