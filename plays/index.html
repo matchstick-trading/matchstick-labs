@@ -34,8 +34,15 @@
   a.play:hover { border-color: #5b7cff; }
   a.play .name { font-weight: 600; }
   a.play .desc { color: #9a9a9a; font-size: 0.9rem; }
-  footer { margin-top: 2rem; font-size: 0.8rem; color: #6a6a6a; }
+  footer { margin-top: 2rem; font-size: 0.8rem; color: #6a6a6a; line-height: 1.7; }
   footer a { color: #6a6a6a; }
+  footer .footer-founder { color: #9a9a9a; margin-bottom: 4px; }
+  footer .footer-links a { margin: 0 3px; }
+  footer details.footer-support-note { margin-top: 6px; }
+  footer details.footer-support-note summary { cursor: pointer; font-size: 0.75rem; color: #6a6a6a; }
+  footer details.footer-support-note summary:hover { color: #9a9a9a; }
+  footer details.footer-support-note p { max-width: 480px; margin: 6px 0 0; font-size: 0.75rem; line-height: 1.5;
+    color: #6a6a6a; }
   h2.systems-heading {
     font-size: 0.78rem;
     text-transform: uppercase;
@@ -119,7 +126,19 @@
     </li>
   </ul>
   <footer>
-    <a href="https://github.com/matchstick-trading/matchstick-labs">source on github</a>
+    <div class="footer-founder">Built by Matthew Hendricks, an independent developer exploring reproducible market-data tools.</div>
+    <div>
+      <a href="https://github.com/matchstick-trading/matchstick-labs">source on github</a>
+    </div>
+    <div class="footer-links">
+      <a href="mailto:hello@matchstick.trading">Contact</a>
+      &middot; <a href="https://buymeacoffee.com/watthem">Support these experiments</a>
+      &middot; <a href="https://github.com/matchstick-trading/matchstick-labs/blob/main/STATUS.md">Service status</a>
+    </div>
+    <details class="footer-support-note">
+      <summary>What does support mean?</summary>
+      <p>Support is optional and does not buy uptime, access, priority, or a particular result.</p>
+    </details>
   </footer>
 </main>
 </body>

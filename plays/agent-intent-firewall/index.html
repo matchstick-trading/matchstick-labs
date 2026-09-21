@@ -134,7 +134,36 @@ header .sub { font-size: 12px; color: var(--text-dim); }
 
 .disclosure { font-size: 10px; color: var(--text-dim); line-height: 1.5; max-width: 640px;
   margin: 16px auto; text-align: center; }
+
+/* Service notice (spec: ServiceNotice component, Level 1 + Level 2) */
+.service-notice { background: var(--surface); border: 1px solid var(--border-light); border-radius: 8px;
+  padding: 14px 16px; margin: 0 0 16px; text-align: left; }
+.service-notice.compact { padding: 12px 14px; margin: 0; }
+.service-notice .sn-headline { display: flex; align-items: center; gap: 8px; font: 700 13px var(--mono);
+  color: var(--amber); margin-bottom: 6px; }
+.service-notice .sn-cause, .service-notice .sn-still-works { font-size: 12px; color: var(--text-muted);
+  line-height: 1.5; margin-bottom: 4px; }
+.service-notice .sn-actions { margin-top: 10px; }
+.service-notice .sn-btn { padding: 7px 14px; border-radius: 6px; background: transparent;
+  border: 1px solid var(--border-light); color: var(--text); font: 600 11px var(--mono); transition: all 0.15s; }
+.service-notice .sn-btn:hover { border-color: var(--brand); color: var(--brand); }
+.service-notice details.sn-details { margin-top: 10px; }
+.service-notice details.sn-details summary { cursor: pointer; font: 600 11px var(--mono); color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.service-notice details.sn-details summary:hover { color: var(--text-muted); }
+.service-notice .sn-detail-grid { margin-top: 8px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px;
+  font-size: 11px; font-family: var(--mono); }
+.service-notice .sn-detail-grid dt { color: var(--text-dim); }
+.service-notice .sn-detail-grid dd { color: var(--text-muted); margin: 0; }
+
 footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text-dim); }
+footer .footer-founder { margin-bottom: 6px; }
+footer .footer-links a { margin: 0 3px; }
+footer details.footer-support-note { margin-top: 8px; }
+footer details.footer-support-note summary { cursor: pointer; font-size: 11px; color: var(--text-dim); }
+footer details.footer-support-note summary:hover { color: var(--text-muted); }
+footer details.footer-support-note p { max-width: 480px; margin: 6px auto 0; font-size: 11px; line-height: 1.5;
+  color: var(--text-dim); }
 
 .faq-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
   width: 28px; height: 28px; color: var(--text-muted); font: 600 14px var(--mono);
@@ -229,9 +258,21 @@ footer { text-align: center; padding: 24px 0; font-size: 12px; color: var(--text
   </p>
 
   <footer>
-    <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
-    &middot; Judged by <a href="https://typesafe.ai">TypeSafe Jev</a>
-    &middot; No broker connection, ever
+    <div class="footer-founder">Built by Matthew Hendricks, an independent developer exploring reproducible market-data tools.</div>
+    <div>
+      <a href="https://github.com/matchstick-trading/matchstick-labs">matchstick-trading/matchstick-labs</a>
+      &middot; Judged by <a href="https://typesafe.ai">TypeSafe Jev</a>
+      &middot; No broker connection, ever
+    </div>
+    <div class="footer-links">
+      <a href="mailto:hello@matchstick.trading">Contact</a>
+      &middot; <a href="https://buymeacoffee.com/watthem">Support these experiments</a>
+      &middot; <a href="https://github.com/matchstick-trading/matchstick-labs/blob/main/STATUS.md">Service status</a>
+    </div>
+    <details class="footer-support-note">
+      <summary>What does support mean?</summary>
+      <p>Support is optional and does not buy uptime, access, priority, or a particular result.</p>
+    </details>
   </footer>
 </div>
 
@@ -311,6 +352,37 @@ function decideGate(draft, risk, judgment, judgmentError) {
   }
 
   return reasons.length ? { status: 'review', reasons } : { status: 'ready', reasons: [] };
+}
+
+// --- Service status (spec: ServiceNotice Level 1 + Level 2) ---
+// The shared Jev worker does not yet emit real reason codes (increment 6 of
+// wiki/service-degradation-implementation-audit.md is not started), so a
+// degraded notice always reports UNKNOWN honestly rather than inventing a
+// more specific one.
+const SERVICE_REASON_CODE = 'UNKNOWN';
+// Set by the owner once a real review date is known. Left null until then —
+// never rendered as a placeholder.
+const NEXT_REVIEW_AT = null;
+
+function renderServiceNotice({ headline, cause, stillWorks, actionLabel, actionId, service, detectedAt, compact }) {
+  const rows = [
+    ['Affected service', service],
+    ['Reason code', SERVICE_REASON_CODE],
+    ['Detected', detectedAt],
+  ];
+  if (NEXT_REVIEW_AT) rows.push(['Next review', NEXT_REVIEW_AT]);
+  const dl = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  return `
+    <div class="service-notice${compact ? ' compact' : ''}">
+      <div class="sn-headline">&#9888; ${headline}</div>
+      <div class="sn-cause">${cause}</div>
+      <div class="sn-still-works">${stillWorks}</div>
+      ${actionLabel ? `<div class="sn-actions"><button type="button" class="sn-btn" id="${actionId || 'sn-retry-btn'}">${actionLabel}</button></div>` : ''}
+      <details class="sn-details">
+        <summary>Service details</summary>
+        <dl class="sn-detail-grid">${dl}</dl>
+      </details>
+    </div>`;
 }
 
 // --- API ---
@@ -415,7 +487,14 @@ function renderRiskPanel(risk, draft) {
 
 function renderJudgePanel(judgment, judgmentError) {
   if (judgmentError) {
-    return `<div class="panel"><h3>Judge — Jev</h3><div class="log-empty" style="color:var(--red)">Jev unavailable — routed to review.</div></div>`;
+    return `<div class="panel"><h3>Judge — Jev</h3>${renderServiceNotice({
+      headline: 'Jev judgment unavailable',
+      cause: 'The judge service did not respond for this draft.',
+      stillWorks: "Code's fail-safe gate already routed this draft to review below — the outcome does not wait on Jev.",
+      service: 'model',
+      detectedAt: new Date().toISOString(),
+      compact: true,
+    })}</div>`;
   }
   if (!judgment) {
     return `<div class="panel"><h3>Judge — Jev</h3><div class="log-empty">Draft incomplete — Jev was not asked.</div></div>`;
@@ -506,7 +585,15 @@ async function runFirewall(text) {
   } catch (err) {
     renderStatus('');
     renderPipeline([{ label: 'Draft failed', state: '' }]);
-    document.getElementById('result-area').innerHTML = `<div class="gate-banner blocked"><div class="title">DRAFT UNAVAILABLE</div><div style="font-size:12px;color:var(--text-muted)">${err.message}. Try again shortly.</div></div>`;
+    document.getElementById('result-area').innerHTML = renderServiceNotice({
+      headline: 'Draft unavailable',
+      cause: `The drafting service did not respond (${err.message}).`,
+      stillWorks: 'Your request text is preserved above — nothing was submitted or executed.',
+      actionLabel: 'Retry',
+      service: 'model',
+      detectedAt: new Date().toISOString(),
+    });
+    document.getElementById('sn-retry-btn')?.addEventListener('click', () => runFirewall(text));
     document.getElementById('draft-btn').disabled = false;
     document.querySelectorAll('.example-btn').forEach(b => b.disabled = false);
     running = false;
