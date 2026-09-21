@@ -2546,8 +2546,9 @@
     list.push({ initials:initials, score:finalScore, created_at:new Date().toISOString() });
     list.sort(function(a,b){ return b.score-a.score; });
     list = list.slice(0,10);
-    try { localStorage.setItem(LB_KEY, JSON.stringify(list)); } catch(e){}
-    return list;
+    var persisted = true;
+    try { localStorage.setItem(LB_KEY, JSON.stringify(list)); } catch(e){ persisted = false; }
+    return { list: list, persisted: persisted };
   }
   function apiBase(){
     var u = window.LEADERBOARD_API_URL;
@@ -2602,24 +2603,36 @@
       + '</div>';
   }
 
-  function renderLeaderboard(list, isLocal){
+  function renderLeaderboard(list, isLocal, persisted){
     var el = document.getElementById("lbList");
-    if (!list || !list.length){ el.innerHTML = '<li class="lbEmpty">No scores yet.</li>'; return; }
+    var noticeEl = document.getElementById("lbNotice");
+    if (!list || !list.length){
+      el.innerHTML = '<li class="lbEmpty">No scores yet.</li>';
+      if (noticeEl) noticeEl.innerHTML = isLocal ? renderServiceNotice(localNoticeOpts(persisted)) : "";
+      return;
+    }
     el.innerHTML = list.map(function(r,i){
       return '<li><span class="lbRank">'+(i+1)+'</span><span class="lbInit">'+escapeHtml(r.initials)+'</span><span class="lbScore">'+r.score+'</span></li>';
     }).join("");
     document.getElementById("lbSource").textContent = isLocal ? "LOCAL (offline)" : "GLOBAL";
-    var noticeEl = document.getElementById("lbNotice");
-    if (noticeEl) {
-      noticeEl.innerHTML = isLocal ? renderServiceNotice({
-        headline: "Leaderboard is local only",
-        cause: "This browser could not reach the global leaderboard service.",
-        stillWorks: "Your score is saved on this device and shown above.",
-        actionText: "Your next run will try submitting to the global leaderboard again automatically.",
-        service: "api",
-        detectedAt: new Date().toISOString()
-      }) : "";
-    }
+    if (noticeEl) noticeEl.innerHTML = isLocal ? renderServiceNotice(localNoticeOpts(persisted)) : "";
+  }
+
+  // `persisted` reflects saveLocalScore's actual localStorage.setItem result — never assume
+  // the save succeeded just because we're in the local-fallback path. There is no retry queue
+  // (submitScore is only ever called from the goSubmit handler), so this notice must not claim
+  // one either.
+  function localNoticeOpts(persisted){
+    return {
+      headline: "Leaderboard is local only",
+      cause: "This browser could not reach the global leaderboard service.",
+      stillWorks: persisted === false
+        ? "Your score could not be saved on this device either (local storage is unavailable or full)."
+        : "Your score is saved on this device and shown above.",
+      actionText: "Scores aren't retried automatically — submit again from this device once the global leaderboard is reachable.",
+      service: "api",
+      detectedAt: new Date().toISOString()
+    };
   }
 
   // M6: the leaderboard submits hwmTicks (the run's high-water-mark PnL), not the
@@ -2639,12 +2652,12 @@
   document.getElementById("goSubmit").addEventListener("click", function(){
     var input = document.getElementById("initialsInput");
     var initials = (input.value || "").trim().toUpperCase().slice(0,3) || "---";
-    saveLocalScore(initials, hwmTicks);
+    var saved = saveLocalScore(initials, hwmTicks);
     submitScore(initials, hwmTicks).then(function(){
       return fetchLeaderboard();
     }).then(function(remote){
       if (remote) renderLeaderboard(remote, false);
-      else renderLeaderboard(loadLocalScores(), true);
+      else renderLeaderboard(saved.list, true, saved.persisted);
     });
     document.getElementById("goSubmit").disabled = true;
     // Disabling the focused button blurs to <body>, which would let Tab escape

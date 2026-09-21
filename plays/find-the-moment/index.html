@@ -419,7 +419,15 @@ async function rankWithJev(candidates, preset) {
       if (res.ok) {
         const data = await res.json();
         if (typeof data.score === 'number' && data.score >= 0 && data.score <= 1) {
-          results.push({ window: w, matchScore: data.score, source: 'jev' });
+          const row = { window: w, matchScore: data.score, source: 'jev' };
+          // Disclose a worker-side cache hit (vaults.DEV-2026-09-278) -- a cache hit is still a
+          // real, already-computed Jev score, so it stays source: 'jev' for scoring purposes;
+          // only the display label changes.
+          if (data.cache === 'hit') {
+            row.cached = true;
+            row.generatedAt = data.generatedAt;
+          }
+          results.push(row);
         } else {
           // 200 with a malformed body — not a real Jev score, do not tag as one.
           results.push({ window: w, matchScore: null, source: 'unavailable' });
@@ -574,7 +582,8 @@ function renderCandidates(ranked, revealed) {
       const pct = Math.round(r.matchScore * 100);
       const color = pct >= 70 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--text-dim)';
       barHtml = `<div class="match-bar"><div class="match-fill" style="width:${pct}%;background:${color}"></div></div>`;
-      labelHtml = `<div class="match-label" style="color:${color}">Jev &middot; ${pct}% match</div>`;
+      const jevLabel = r.cached ? `Jev (cached, ${formatCacheDate(r.generatedAt)})` : 'Jev';
+      labelHtml = `<div class="match-label" style="color:${color}">${jevLabel} &middot; ${pct}% match</div>`;
     } else if (r.source === 'deterministic') {
       const pct = Math.round(r.matchScore * 100);
       barHtml = `<div class="match-bar"><div class="match-fill" style="width:${pct}%;background:var(--text-dim)"></div></div>`;
@@ -596,6 +605,13 @@ function renderCandidates(ranked, revealed) {
   }
   html += '</div>';
   area.innerHTML = html;
+}
+
+// Formats a worker-supplied `generatedAt` ISO timestamp as a plain date for the
+// "Jev (cached, {date})" disclosure label. Never invents a date -- only called
+// with a real value that came from the worker response (vaults.DEV-2026-09-278).
+function formatCacheDate(generatedAt) {
+  return typeof generatedAt === 'string' ? generatedAt.slice(0, 10) : 'unknown date';
 }
 
 function renderMiniChart(bars) {

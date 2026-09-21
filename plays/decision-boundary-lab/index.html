@@ -306,7 +306,11 @@ function cacheKey(s) { return FEATURE_KEYS.map(k => s[k]).join('|'); }
 
 async function queryJev(s) {
   const key = cacheKey(s);
-  if (cache.has(key)) return cache.get(key);
+  // This in-memory `cache` (avoids redundant calls within one browser session) is a *different*
+  // mechanism from the worker's own KV cache (vaults.DEV-2026-09-278) -- disclose a hit from
+  // either one to the user (see `renderJevPanel`), without conflating the two internally: a
+  // `clientCached` hit here never overwrites the worker's own `cache`/`generatedAt` fields.
+  if (cache.has(key)) return { ...cache.get(key), clientCached: true };
   const res = await fetch(BOUNDARY_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -316,6 +320,13 @@ async function queryJev(s) {
   const data = await res.json();
   cache.set(key, data);
   return data;
+}
+
+// Formats a worker-supplied `generatedAt` ISO timestamp as a plain date for the
+// "Jev (cached, {date})" disclosure label. Never invents a date -- only called
+// with a real value that came from the worker response (vaults.DEV-2026-09-278).
+function formatCacheDate(generatedAt) {
+  return typeof generatedAt === 'string' ? generatedAt.slice(0, 10) : 'unknown date';
 }
 
 // --- State ---
@@ -379,6 +390,12 @@ function renderJevPanel(det, jev, state_) {
   const sorted = REGIME_CLASSES.slice().sort((a, b) => (jev.probs[b] ?? 0) - (jev.probs[a] ?? 0));
   const top = sorted[0];
   const agree = top === det.regime;
+  // A result is cached if *either* the worker says so or it came from this play's own
+  // in-memory `cache` Map above -- don't miss either mechanism.
+  const isCached = jev.cache === 'hit' || jev.clientCached === true;
+  const cacheTagHtml = isCached
+    ? `<div class="match-tag" style="background:#71717a22;color:var(--text-muted);margin-bottom:8px;">Jev (cached, ${formatCacheDate(jev.generatedAt)})</div>`
+    : '';
   const distHtml = REGIME_CLASSES.map(c => {
     const pct = Math.round((jev.probs[c] ?? 0) * 100);
     return `<div class="dist-row ${c === top ? 'top' : ''}">
@@ -390,6 +407,7 @@ function renderJevPanel(det, jev, state_) {
   return `
     <div class="panel">
       <h3>Jev — regime distribution</h3>
+      ${cacheTagHtml}
       ${distHtml}
       <div class="gauges">
         <div class="gauge"><div class="label">Regime change likely</div><div class="val">${Math.round(jev.changeLikely * 100)}%</div></div>
