@@ -291,6 +291,16 @@ async function loadFixtures() {
 
 const AUTOPSY_ENDPOINT = 'https://jev.matchstick.trading/api/autopsy';
 
+// A 200 response is not automatically a real verdict — validate shape and
+// range before trusting it as Jev output, so a malformed body (unknown
+// family, out-of-range confidence) can't slip through as a genuine result.
+function isValidVerdict(data) {
+  if (!data || typeof data.family !== 'string' || !ALL_CLASSES.includes(data.family)) return false;
+  if (typeof data.confidence !== 'number' || data.confidence < 0 || data.confidence > 1) return false;
+  if (!data.probabilities || typeof data.probabilities !== 'object') return false;
+  return Object.values(data.probabilities).every(p => typeof p === 'number' && p >= 0 && p <= 1);
+}
+
 async function triageOne(run) {
   const state = { ...run.computed };
   delete state._raw;
@@ -302,10 +312,10 @@ async function triageOne(run) {
     });
     if (res.ok) {
       const data = await res.json();
-      if (typeof data.family === 'string' && data.probabilities && typeof data.confidence === 'number') {
+      if (isValidVerdict(data)) {
         return { run, family: data.family, probabilities: data.probabilities, confidence: data.confidence, source: 'jev' };
       }
-      // 200 with a malformed body — not a real Jev verdict, do not tag as one.
+      // 200 with a malformed or out-of-range body — not a real Jev verdict, do not tag as one.
     }
   } catch {
     // Jev unreachable for this run.
