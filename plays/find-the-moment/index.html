@@ -418,7 +418,7 @@ async function rankWithJev(candidates, preset) {
 
       if (res.ok) {
         const data = await res.json();
-        if (typeof data.score === 'number') {
+        if (typeof data.score === 'number' && data.score >= 0 && data.score <= 1) {
           results.push({ window: w, matchScore: data.score, source: 'jev' });
         } else {
           // 200 with a malformed body — not a real Jev score, do not tag as one.
@@ -458,19 +458,27 @@ function rankDeterministic(candidates, preset) {
 function scoreResults(ranked, preset) {
   const targetType = preset.target_type;
 
-  // Check which of top-3 are true matches
-  const top3 = ranked.slice(0, 3);
+  // Ranking metrics (Recall@3, MRR) count only rows Jev actually scored.
+  // `ranked` sorts Jev-scored rows first and unavailable rows last in their
+  // original candidate order, not by any real relevance signal — mixing them
+  // in would let an unavailable row "win" a rank slot by coincidence during
+  // a partial outage.
+  const jevRows = ranked.filter(r => r.source === 'jev');
+
+  const top3 = jevRows.slice(0, 3);
   const top3Matches = top3.filter(r => {
     const label = LABELS[r.window.id];
     return label?.episodes?.some(e => e.type === targetType);
   });
 
   const recall3 = top3Matches.length;
+  const rankedCount = jevRows.length;
 
-  // Mean reciprocal rank
+  // Mean reciprocal rank — over Jev-scored rows only, indexed within that
+  // subset so an unavailable row's position never inflates the rank.
   let mrr = 0;
-  for (let i = 0; i < ranked.length; i++) {
-    const label = LABELS[ranked[i].window.id];
+  for (let i = 0; i < jevRows.length; i++) {
+    const label = LABELS[jevRows[i].window.id];
     if (label?.episodes?.some(e => e.type === targetType)) {
       mrr = 1 / (i + 1);
       break;
@@ -485,7 +493,6 @@ function scoreResults(ranked, preset) {
   // Brier score (binary: did we rank matches above non-matches?) — Jev-scored
   // rows only. A deterministic or unavailable row has no real match
   // probability, so it cannot be scored as one.
-  const jevRows = ranked.filter(r => r.source === 'jev');
   let brierSum = 0;
   for (const r of jevRows) {
     const label = LABELS[r.window.id];
@@ -495,7 +502,7 @@ function scoreResults(ranked, preset) {
   const brier = jevRows.length ? brierSum / jevRows.length : null;
   const brierCount = jevRows.length;
 
-  return { recall3, totalMatches, mrr, brier, brierCount, topMatch: top3Matches.length > 0 };
+  return { recall3, rankedCount, totalMatches, mrr, brier, brierCount, topMatch: top3Matches.length > 0 };
 }
 
 // --- UI ---
@@ -634,12 +641,12 @@ function renderScores(scores) {
       <h3>Evaluation</h3>
       <div class="grid">
         <div class="metric">
-          <div class="label">Recall@3</div>
-          <div class="value" style="color:${r3Color}">${scores.recall3} / ${Math.min(3, scores.totalMatches)}</div>
+          <div class="label">Recall@3 (Jev, n=${scores.rankedCount})</div>
+          <div class="value" style="color:${r3Color}">${scores.recall3} / ${Math.min(3, scores.rankedCount, scores.totalMatches)}</div>
         </div>
         <div class="metric">
-          <div class="label">MRR</div>
-          <div class="value" style="color:${mrrColor}">${scores.mrr.toFixed(2)}</div>
+          <div class="label">MRR (Jev, n=${scores.rankedCount})</div>
+          <div class="value" style="color:${mrrColor}">${scores.rankedCount ? scores.mrr.toFixed(2) : 'n/a'}</div>
         </div>
         <div class="metric">
           <div class="label">Brier score (Jev, n=${scores.brierCount})</div>
