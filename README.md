@@ -36,3 +36,9 @@ Cloudflare (which hosts the site and the Jev API) has a problem.
 These are meant to be played, shared, and reacted to — not filed away. If one of these ideas ever
 grows into a real product feature, that conversation happens separately and explicitly; nothing
 here should be read as a promise that it will.
+
+As of 2026-09-25, that conversation has happened for `agent-intent-firewall`: its shape is the
+starting point for the next Matchstick Replay product piece, tracked in
+[matchstick-tte#115](https://github.com/matchstick-trading/matchstick-tte/issues/115). This play
+itself stays exactly what it is — a standalone, paper-trade-only experiment — regardless of
+whether or how that product work proceeds.
