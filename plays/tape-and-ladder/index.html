@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b1220">
+<meta name="theme-color" content="#0b0d12">
 <title>Tape &amp; Ladder — Matchstick Labs</title>
 <meta name="description" content="Read the market. Jump the risk. Keep your edge.">
 <meta property="og:type" content="website">
@@ -15,26 +15,30 @@
 <meta name="twitter:title" content="Tape &amp; Ladder — Matchstick Labs">
 <meta name="twitter:description" content="Read the market. Jump the risk. Keep your edge.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{color-scheme:dark;--void:#0b1220;--panel:#101c2d;--rule:#26374c;--phosphor:#43d9ad;--phosphor-dim:#286857;--down:#fa7785;--paper:#e6edf7;--muted:#9aaec6;--amber:#f2bb66;--mono:"IBM Plex Mono",ui-monospace,monospace}
+  /* Palette follows matchstick.trading (replay-landing.css tokens): graphite ground, hot-pink accent for
+     brand and interaction, --bid/--ask only where up/down means something. Amber stays the game's hazard colour.
+     Names kept (--phosphor = up/bid, --down = ask) so no rule or script changes meaning. */
+  :root{color-scheme:dark;--void:#0b0d12;--panel:#12151c;--panel-deep:#090b0f;--raised:#1a1e27;--rule:#232833;--rule-bright:#333a49;--phosphor:#35c48c;--phosphor-dim:#1f6e50;--down:#e2506e;--paper:#e8eaef;--muted:#8c93a3;--amber:#f2bb66;--accent:#ff2a85;--accent-soft:#ff5c8d;--accent-press:#ff4d97;--accent-light:#ff758f;--on-accent:#1a0010;--sans:"Archivo","IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
-  body{margin:0;background:var(--void);color:var(--paper);font:15px/1.5 "IBM Plex Sans",sans-serif;padding:16px 28px}
+  body{margin:0;background:var(--void);color:var(--paper);font:15px/1.5 var(--sans);padding:16px 28px}
   button,input{font:inherit}
-  button{border:1px solid var(--rule);border-radius:5px;padding:9px 14px;background:#19293e;color:var(--paper);cursor:pointer;min-height:42px;font-weight:500}
-  button:hover{background:#263b54;border-color:#6584a5}
+  button{border:1px solid var(--rule);border-radius:5px;padding:9px 14px;background:var(--raised);color:var(--paper);cursor:pointer;min-height:42px;font-weight:500}
+  button:hover{background:#262b36;border-color:#7d8698}
   button:disabled{opacity:.55;cursor:default}
-  button:focus-visible,a:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-  canvas:focus-visible{outline:1px solid #6584a5;outline-offset:-1px}
-  button.primary{background:var(--phosphor);color:#08241c;border-color:var(--phosphor);font-weight:600}
-  button.primary:hover{background:#78e9c7}
+  button:focus-visible,a:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  canvas:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+  button.primary{background:linear-gradient(100deg,var(--accent),var(--accent-soft));color:var(--on-accent);border-color:var(--accent);font-weight:600}
+  button.primary:hover{background:linear-gradient(100deg,var(--accent-press),var(--accent-light));border-color:var(--accent-press)}
+  button.primary kbd{color:var(--on-accent);border-color:rgba(26,0,16,.45)}
   .ghost{background:transparent;color:var(--muted)}
-  kbd{font:11px var(--mono);padding:2px 5px;border:1px solid #425771;border-bottom-width:2px;border-radius:3px;color:var(--paper);white-space:nowrap}
+  kbd{font:11px var(--mono);padding:2px 5px;border:1px solid var(--rule-bright);border-bottom-width:2px;border-radius:3px;color:var(--paper);white-space:nowrap}
   .wrap{max-width:min(1200px,calc((100dvh - 370px)*1.69 + 280px));margin:auto}
   header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:12px}
   .identity{display:flex;align-items:center;gap:14px}
-  .mark{width:40px;height:40px;color:var(--phosphor);flex:none}
+  .mark{width:40px;height:40px;color:var(--accent);flex:none}
   h1{font-size:28px;line-height:1.1;letter-spacing:-1px;margin:0;font-weight:600}
   .thesis{font-size:13px;color:var(--muted);margin:6px 0 0}
   .headerActions{display:flex;gap:8px;align-items:center;flex-shrink:0}.headerActions button{white-space:nowrap}
@@ -64,7 +68,7 @@
   .canvas-shell{position:relative;min-width:0}
   canvas{display:block;width:100%;height:auto}
   #terrainCanvas{touch-action:manipulation}
-  .setupCard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(11,18,32,.92);padding:20px;gap:12px}
+  .setupCard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(11,13,18,.92);padding:20px;gap:12px}
   .setupCard h2{font-size:clamp(21px,3vw,32px);letter-spacing:-.7px;font-weight:500}
   .setupCard p{max-width:43ch;margin:0;color:var(--muted);font-size:14px}
   .setupCard .setupPosition{font:500 16px var(--mono);color:var(--paper);padding:9px 18px;border:1px solid var(--rule);border-radius:4px}
@@ -89,15 +93,15 @@
   #regen{min-height:36px;padding:6px 12px}
   .controlsLegend{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--muted)}
   footer{font-size:11px;color:var(--muted);margin-top:14px;display:flex;justify-content:space-between;gap:16px}
-  .overlay{position:fixed;inset:0;background:rgba(4,10,20,.84);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
-  .overlayCard{background:var(--panel);border:1px solid #425771;border-radius:10px;max-width:520px;width:100%;max-height:calc(100dvh - 40px);overflow-y:auto;padding:28px;box-shadow:0 24px 80px #0007}
+  .overlay{position:fixed;inset:0;background:rgba(5,6,9,.84);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .overlayCard{background:var(--panel);border:1px solid var(--rule-bright);border-radius:10px;max-width:520px;width:100%;max-height:calc(100dvh - 40px);overflow-y:auto;padding:28px;box-shadow:0 24px 80px #0007}
   .overlayCard h2{font-size:26px;letter-spacing:-.6px;margin:0 0 16px}
   .overlayCard p{color:var(--muted);font-size:14px;margin:0 0 15px}
   .overlayCard b{color:var(--paper)}
   .kbrow{display:flex;align-items:baseline;gap:12px;margin:12px 0;font-size:13px}
-  .lesson{padding:14px;background:#182a40;border-radius:5px;font-size:13px;color:var(--muted);margin:18px 0}
+  .lesson{padding:14px;background:var(--raised);border-radius:5px;font-size:13px;color:var(--muted);margin:18px 0}
   .close{display:block;margin:18px 0 0 auto}
-  .goScoreLine{font:500 44px var(--mono);color:var(--phosphor)}
+  .goScoreLine{font:500 44px var(--mono);color:var(--accent)}
   .goForm{display:flex;align-items:center;gap:10px;margin:20px 0 12px;font-size:12px}
   .goForm input{width:5em;background:var(--void);border:1px solid var(--rule);color:var(--paper);padding:8px;text-transform:uppercase;font-family:var(--mono)}
   .goActions{display:flex;gap:8px}
@@ -107,11 +111,11 @@
   #lbList{list-style:none;padding:0;font:12px var(--mono)}
   #lbList li{display:flex;gap:12px;padding:6px 0}
   .lbRank{color:var(--muted);width:1.6em}
-  .lbInit{flex:1;color:var(--phosphor)}
+  .lbInit{flex:1;color:var(--paper)}
   .lbScore{color:var(--paper);font-weight:600;text-align:right}
   .lbEmpty{color:var(--muted);padding:6px 0}
   /* Service notice (spec: ServiceNotice component, Level 1 + Level 2) */
-  .service-notice{background:#182a40;border:1px solid var(--rule);border-radius:6px;padding:10px 12px;margin-top:10px;text-align:left}
+  .service-notice{background:var(--raised);border:1px solid var(--rule);border-radius:6px;padding:10px 12px;margin-top:10px;text-align:left}
   .service-notice .sn-headline{display:flex;align-items:center;gap:8px;font:600 12px var(--mono);color:var(--amber);margin-bottom:5px}
   .service-notice .sn-cause,.service-notice .sn-still-works{font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:3px}
   .service-notice details.sn-details{margin-top:8px}
@@ -122,7 +126,7 @@
   .service-notice .sn-detail-grid dd{color:var(--paper);margin:0}
   /* Level 3 footer */
   footer.labs-footer{display:block;font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6}
-  footer.labs-footer a,.service-notice a{color:var(--phosphor)}
+  footer.labs-footer a,.service-notice a{color:var(--paper)}
   .labs-footer .lf-founder{margin-bottom:4px}
   .labs-footer .lf-row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .labs-footer .lf-links a{margin:0 3px}
@@ -142,7 +146,7 @@
     .setupCard{gap:8px;padding:14px}.setupCard h2{font-size:22px}.setupCard p{font-size:12px;max-width:36ch}.setupCard .setupPosition{font-size:12px;padding:5px 10px}.setupCard .startHint{font-size:10px}.lessonPreview{display:none}
     .canvas-shell:has(#setupCard:not([hidden])){min-height:250px}
     .bottomBar{align-items:flex-start}.controlsLegend{gap:9px;font-size:11px}#regen{font-size:11px;white-space:nowrap}.overlayCard{padding:22px}.overlayCard h2{font-size:23px}.overlayCard p{font-size:13px}footer{font-size:10px;margin-top:18px}
-    body.touchMode{padding-bottom:86px}.touchControls.active{display:flex;position:fixed;bottom:0;left:0;right:0;gap:8px;background:#0b1220f5;border-top:1px solid var(--rule);padding:10px 12px calc(10px + env(safe-area-inset-bottom));z-index:40}.touchBtn{flex:1;min-height:48px;font-size:12px;touch-action:none;user-select:none}.touchBtn[data-action="jump"]{flex:2;background:var(--phosphor);color:#08241c}
+    body.touchMode{padding-bottom:86px}.touchControls.active{display:flex;position:fixed;bottom:0;left:0;right:0;gap:8px;background:#0b0d12f5;border-top:1px solid var(--rule);padding:10px 12px calc(10px + env(safe-area-inset-bottom));z-index:40}.touchBtn{flex:1;min-height:48px;font-size:12px;touch-action:none;user-select:none}.touchBtn[data-action="jump"]{flex:2;background:linear-gradient(100deg,var(--accent),var(--accent-soft));color:var(--on-accent);border-color:var(--accent)}
   }
   @media(pointer:coarse) and (min-width:761px){.touchControls.active{display:flex;gap:10px;max-width:1360px;margin:16px auto}.touchBtn{min-width:100px;touch-action:none}}
   @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
@@ -152,7 +156,7 @@
 <div class="wrap">
   <header>
     <div class="identity">
-      <svg class="mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 5v30m12-34v34m12-24v28" stroke="currentColor" stroke-width="2"/><path d="M4 13h8v13H4zm12-5h8v15h-8z" fill="currentColor"/><path d="M28 22h8v10h-8z" fill="#fa7785"/></svg>
+      <svg class="mark" viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M8 5v30m12-34v34m12-24v28" stroke="currentColor" stroke-width="2"/><path d="M4 13h8v13H4zm12-5h8v15h-8z" fill="currentColor"/><path d="M28 22h8v10h-8z" fill="#e2506e"/></svg>
       <div><h1>Tape &amp; Ladder</h1><p class="thesis">Read the market. Jump the risk. Keep your edge.</p></div>
     </div>
     <div class="headerActions">
@@ -174,7 +178,7 @@
       <div class="canvas-shell">
         <canvas id="terrainCanvas" width="680" height="402" tabindex="0" aria-label="Auto-running candle course. Space or up arrow jumps; hold for a higher jump. W and S adjust the risk ladder."></canvas>
         <div class="setupCard" id="setupCard">
-          <div class="lessonPreview" aria-hidden="true"><svg viewBox="0 0 118 48"><path d="M0 43h118" stroke="#425771"/><path d="M8 36Q47-19 85 36" stroke="#f2bb66" stroke-dasharray="3 4"/><path d="M61 9v33" stroke="#fa7785"/><path d="M55 20h12v17H55z" fill="#fa7785"/><path d="M51 17v26h20V17" stroke="#f2bb66" fill="none"/><rect x="5" y="29" width="9" height="14" fill="#e6edf7"/></svg></div>
+          <div class="lessonPreview" aria-hidden="true"><svg viewBox="0 0 118 48"><path d="M0 43h118" stroke="#333a49"/><path d="M8 36Q47-19 85 36" stroke="#f2bb66" stroke-dasharray="3 4"/><path d="M61 9v33" stroke="#e2506e"/><path d="M55 20h12v17H55z" fill="#e2506e"/><path d="M51 17v26h20V17" stroke="#f2bb66" fill="none"/><rect x="5" y="29" width="9" height="14" fill="#e8eaef"/></svg></div>
           <h2>Trade your way through the tape.</h2>
           <p>Jump amber gates. Read candles at their prices.<br>The tape runs automatically.</p>
           <div class="setupPosition" id="setupPosition">LONG · 1× leverage</div>
@@ -1663,7 +1667,7 @@
         // and the rest of this same gap's span behaves like solid ground again.
         gapHere.fallResolved = true;
         SoundFX.gapFall();
-        applyPnlDelta(-3, "gap", "#ff6b5c", true);
+        applyPnlDelta(-3, "gap", "#ff6b6b", true);
         player.y = baseline - PLAYER_H;
         player.vy = 0;
         player.onGround = true;
@@ -1801,11 +1805,11 @@
 
   function resolveBar(b, kind){
     b.resolved = true;
-    var delta = 0, color = "#6ef2a0", big = false;
-    if (kind === "hit"){ delta = -3; color = "#ff6b5c"; big = true; SoundFX.bump(); }
+    var delta = 0, color = "#35c48c", big = false;
+    if (kind === "hit"){ delta = -3; color = "#ff6b6b"; big = true; SoundFX.bump(); }
     else if (kind === "clear"){ delta = 2; big = true; SoundFX.obstacleClear(); }
     else if (kind === "favorable"){ delta = 1; SoundFX.pnlTick(1); }
-    else if (kind === "rough"){ delta = -1; color = "#ff6b5c"; SoundFX.pnlTick(-1); }
+    else if (kind === "rough"){ delta = -1; color = "#ff6b6b"; SoundFX.pnlTick(-1); }
     applyPnlDelta(delta, "candle", color, big);
   }
 
@@ -1944,7 +1948,7 @@
         hit.hitApplied = true;
         var hitSound = hz.type === "wall" ? "wallHit" : (hz.type === "volSpikes" ? "bump" : "hazardHit");
         SoundFX[hitSound]();
-        applyPnlDelta(-3, hz.type, "#ff6b5c", true);
+        applyPnlDelta(-3, hz.type, "#ff6b6b", true);
       }
     }
   }
@@ -1976,7 +1980,7 @@
   function marginCall(){
     phase = "gameover";
     SoundFX.stoppedOut();
-    banner = { text: "MARGIN CALL", color: "#ff6b5c", until: performance.now()+1000 };
+    banner = { text: "MARGIN CALL", color: "#ff6b6b", until: performance.now()+1000 };
     var msg = hazardName(lastHitSource) + " ended the run at " + leverage + "×. Your drawdown reached " +
       (hwmTicks - pnlTicks) + " ticks against a " + (BASE_CUSHION / leverage).toFixed(1) +
       "-tick allowance. " + (leverage > 1 ? "Try 1× for more room to recover." :
@@ -2013,7 +2017,7 @@
     if (bandEndAll < cam || hz.pivotX > cam+w) return; // fully off-screen
     for (var i=0;i<hz.lines.length;i++){
       var ln = hz.lines[i];
-      ctx.strokeStyle = ln.hostile ? "#ff6b5c" : "#6ef2a0";
+      ctx.strokeStyle = ln.hostile ? "#ff6b6b" : "#35c48c";
       ctx.lineWidth = 1.5;
 
       var coreX0 = Math.max(hz.pivotX, cam), coreX1 = Math.min(hz.pivotX+hz.coreWidthPx, cam+w);
@@ -2047,7 +2051,7 @@
     if (geometry.xEnd < cam || geometry.xStart > cam+w) return; // fully off-screen
     var x0 = Math.max(geometry.xStart, cam) - cam, x1 = Math.min(geometry.xEnd, cam+w) - cam;
     var y = geometry.y;
-    ctx.strokeStyle = hz.hostile ? "#ff6b5c" : "#6ef2a0";
+    ctx.strokeStyle = hz.hostile ? "#ff6b6b" : "#35c48c";
     ctx.lineWidth = 2;
     ctx.globalAlpha = hz.hostile ? .9 : .4;
     // Resistance remains a dashed limit; support is a continuous landable rail.
@@ -2055,7 +2059,7 @@
     ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = hz.hostile ? "#ff6b5c" : "#7fa38c";
+    ctx.fillStyle = hz.hostile ? "#ff6b6b" : "#7fa38c";
     ctx.font = "10px 'IBM Plex Mono', monospace";
     var label = wallLabel(hz, geometry);
     ctx.fillText(label, x0+6, hz.role === "resistance" ? y-6 : y+14);
@@ -2150,10 +2154,10 @@
     var x0 = Math.max(hz.xStart, cam) - cam, x1 = Math.min(hz.xEnd, cam+w) - cam;
     // Erase the ground stripe. drawTerrain() paints candles afterward so any
     // ordinary collision geometry in this span remains visible.
-    ctx.fillStyle = "#0b1220"; // --void
+    ctx.fillStyle = "#0b0d12"; // --void
     ctx.globalAlpha = 1;
     ctx.fillRect(x0, baseline-GAP_VOID_HEIGHT_PX, x1-x0, GAP_VOID_HEIGHT_PX + (tSurf.h-baseline));
-    ctx.strokeStyle = "#ff6b5c";
+    ctx.strokeStyle = "#ff6b6b";
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x0, baseline-GAP_VOID_HEIGHT_PX); ctx.lineTo(x0, tSurf.h);
@@ -2192,7 +2196,7 @@
   function drawTerrain(cam, idx){
     var ctx = tSurf.ctx, w = tSurf.w, h = tSurf.h, baseline = baselineY();
     ctx.clearRect(0,0,w,h);
-    ctx.fillStyle = "#101c2d"; ctx.fillRect(0,0,w,h);
+    ctx.fillStyle = "#12151c"; ctx.fillRect(0,0,w,h);
     var startI = Math.max(0, Math.floor(cam/COLW)-1), endI = Math.ceil((cam+w)/COLW)+1;
     chartWindowStartI = startI; chartWindowEndI = endI;
     var volScale = VOL_PANE_MIN_SCALE;
@@ -2201,18 +2205,18 @@
       if (volB && volB.bodyMag > volScale) volScale = volB.bodyMag;
     }
     var priceTicks = gameplayPriceTicks(), priceTop = priceTicks[0].y;
-    ctx.fillStyle = "#0c1726"; ctx.fillRect(0,priceTop,w,baseline-priceTop);
-    ctx.lineWidth = 1; ctx.strokeStyle = "#213047";
+    ctx.fillStyle = "#090b0f"; ctx.fillRect(0,priceTop,w,baseline-priceTop);
+    ctx.lineWidth = 1; ctx.strokeStyle = "#232833";
     for (var gx = -(cam % (COLW*4));gx<w;gx+=COLW*4){
       ctx.beginPath(); ctx.moveTo(gx,priceTop); ctx.lineTo(gx,baseline); ctx.stroke();
     }
     for (var gy=0;gy<priceTicks.length;gy++){
       ctx.beginPath(); ctx.moveTo(0,priceTicks[gy].y); ctx.lineTo(w,priceTicks[gy].y); ctx.stroke();
     }
-    ctx.strokeStyle = "#4b617a";
+    ctx.strokeStyle = "#4a5162";
     ctx.beginPath(); ctx.moveTo(0,baseline); ctx.lineTo(w,baseline); ctx.stroke();
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.fillStyle = "#9aaec6";
+    ctx.fillStyle = "#8c93a3";
     ctx.fillText("PRICE + CHART OBJECTS",12,priceTop-16);
     ctx.fillText("AMBER MARKER = RISK CANDLE · OUTLINE = JUMP GATE",12,priceTop-4);
     if (phase !== "setup"){
@@ -2221,7 +2225,7 @@
       for (var i=startI;i<=endI;i++){
         var b = barAt(i); if (!b) continue;
         var candle = candleGameplayGeometry(b, i);
-        var sx = candle.worldX-cam, col = b.bull ? "#43d9ad" : "#fa7785";
+        var sx = candle.worldX-cam, col = b.bull ? "#35c48c" : "#e2506e";
         // One fixed-scale market candle. Its price geometry is informational in
         // Gate C; the separate amber gate below is the exact arcade collision.
         ctx.globalAlpha = b.resolved ? .48 : 1;
@@ -2229,7 +2233,7 @@
         ctx.beginPath(); ctx.moveTo(candle.wickX-cam,candle.wickTopY); ctx.lineTo(candle.wickX-cam,candle.wickBottomY); ctx.stroke();
         var cy = candle.bodyTopY, ch = Math.max(2,candle.bodyBottomY-candle.bodyTopY);
         var bodyX = candle.bodyXStart-cam, bodyW = candle.bodyXEnd-candle.bodyXStart;
-        if (b.bull){ ctx.fillStyle="#0c1726"; ctx.fillRect(bodyX,cy,bodyW,ch); ctx.strokeRect(bodyX,cy,bodyW,ch); }
+        if (b.bull){ ctx.fillStyle="#090b0f"; ctx.fillRect(bodyX,cy,bodyW,ch); ctx.strokeRect(bodyX,cy,bodyW,ch); }
         else ctx.fillRect(bodyX,cy,bodyW,ch);
         if (b.isObstacle){
           var gate = obstacleGateGeometry(i*COLW+HIT_INSET_X, (i+1)*COLW-HIT_INSET_X, b.hurdlePx);
@@ -2246,7 +2250,7 @@
           ctx.globalAlpha = b.resolved ? .35 : 1;ctx.lineWidth=1.5;
           ctx.strokeRect(gate.xStart-cam,gate.topY,gate.xEnd-gate.xStart,gate.bottomY-gate.topY);
         } else if (b.sampled){
-          ctx.globalAlpha=b.resolved?.25:.7;ctx.fillStyle=b.favorable?"#43d9ad":"#fa7785";
+          ctx.globalAlpha=b.resolved?.25:.7;ctx.fillStyle=b.favorable?"#35c48c":"#e2506e";
           ctx.font="10px 'IBM Plex Mono', monospace";
           ctx.fillText(b.favorable?"+":"−",sx+8,baseline-4);
         }
@@ -2261,30 +2265,30 @@
       }
       drawHazards(ctx,cam,w);
       // The axis uses the same fixed transform as candles and walls.
-      ctx.fillStyle="#101c2d";ctx.fillRect(w-55,priceTop-10,55,baseline-priceTop+12);
-      ctx.fillStyle="#9aaec6";ctx.textAlign="right";ctx.font="10px 'IBM Plex Mono', monospace";
+      ctx.fillStyle="#12151c";ctx.fillRect(w-55,priceTop-10,55,baseline-priceTop+12);
+      ctx.fillStyle="#8c93a3";ctx.textAlign="right";ctx.font="10px 'IBM Plex Mono', monospace";
       for (var tick=0;tick<priceTicks.length;tick++) ctx.fillText(priceTicks[tick].label,w-7,priceTicks[tick].y+3);
       ctx.textAlign="left";
       var current=barAt(terrainIndexAt(player.x));
       if (current){
-        var currentY=priceToGameplayY(current.close), currentColor=current.bull?"#43d9ad":"#fa7785";
+        var currentY=priceToGameplayY(current.close), currentColor=current.bull?"#35c48c":"#e2506e";
         ctx.strokeStyle=currentColor;ctx.globalAlpha=.45;ctx.setLineDash([4,4]);
         ctx.beginPath();ctx.moveTo(0,currentY);ctx.lineTo(w-55,currentY);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
         ctx.fillStyle=currentColor;ctx.fillRect(w-55,currentY-9,55,18);
-        ctx.fillStyle="#0b1220";ctx.textAlign="right";ctx.fillText(displayPrice(current.close),w-6,currentY+3);ctx.textAlign="left";
-        ctx.fillStyle="#9aaec6";ctx.font="10px 'IBM Plex Mono', monospace";
+        ctx.fillStyle="#0b0d12";ctx.textAlign="right";ctx.fillText(displayPrice(current.close),w-6,currentY+3);ctx.textAlign="left";
+        ctx.fillStyle="#8c93a3";ctx.font="10px 'IBM Plex Mono', monospace";
         ctx.fillText("O "+displayPrice(current.open)+"   H "+displayPrice(current.wickHi)+"   L "+displayPrice(current.wickLo)+"   C "+displayPrice(current.close),12,16);
       }
     }
     var playerScreenX=player.x-cam;
-    ctx.strokeStyle="#8ca3bd";ctx.globalAlpha=.35;ctx.setLineDash([3,5]);
+    ctx.strokeStyle="#8c93a3";ctx.globalAlpha=.35;ctx.setLineDash([3,5]);
     ctx.beginPath();ctx.moveTo(playerScreenX,24);ctx.lineTo(playerScreenX,baseline);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
     // The position marker has a distinct white silhouette and side-colored spine.
-    ctx.fillStyle="#e6edf7";ctx.fillRect(playerScreenX-PLAYER_W/2,player.y,PLAYER_W,PLAYER_H);
-    ctx.fillStyle=direction==="LONG"?"#43d9ad":"#fa7785";
+    ctx.fillStyle="#e8eaef";ctx.fillRect(playerScreenX-PLAYER_W/2,player.y,PLAYER_W,PLAYER_H);
+    ctx.fillStyle=direction==="LONG"?"#35c48c":"#e2506e";
     ctx.fillRect(playerScreenX-PLAYER_W/2,player.y,3,PLAYER_H);
-    ctx.fillStyle="#0b1220";ctx.fillRect(playerScreenX+1,player.y+4,3,3);
-    ctx.font="10px 'IBM Plex Mono', monospace";ctx.fillStyle="#e6edf7";
+    ctx.fillStyle="#0b0d12";ctx.fillRect(playerScreenX+1,player.y+4,3,3);
+    ctx.font="10px 'IBM Plex Mono', monospace";ctx.fillStyle="#e8eaef";
     ctx.textAlign="center";ctx.fillText("YOU",playerScreenX,baseline+13);ctx.textAlign="left";
     var ftNow=performance.now();
     floatingTexts=floatingTexts.filter(function(ft){return ftNow-ft.startedAt<ft.duration;});
@@ -2295,12 +2299,12 @@
       ctx.fillStyle=ft.color;ctx.fillText(ft.text,ft.x-cam,ft.y-(reducedMotion?0:age*16));
     });
     ctx.globalAlpha=1;ctx.textAlign="left";
-    ctx.fillStyle="#9aaec6";ctx.font="9px 'IBM Plex Mono', monospace";
+    ctx.fillStyle="#8c93a3";ctx.font="9px 'IBM Plex Mono', monospace";
     ctx.fillText("Price move",12,h-8);
     ctx.textAlign="right";ctx.fillText(Math.floor(rampDistancePx/COLW)+" bars traveled",w-12,h-8);ctx.textAlign="left";
     if (banner && performance.now()<banner.until){
-      ctx.fillStyle="#0b1220e8";ctx.fillRect(w/2-120,h/2-28,240,54);
-      ctx.fillStyle="#fa7785";ctx.font="600 25px 'IBM Plex Sans', sans-serif";ctx.textAlign="center";
+      ctx.fillStyle="#0b0d12e8";ctx.fillRect(w/2-120,h/2-28,240,54);
+      ctx.fillStyle="#e2506e";ctx.font="600 25px 'Archivo', 'IBM Plex Sans', sans-serif";ctx.textAlign="center";
       ctx.fillText("Margin called",w/2,h/2+8);ctx.textAlign="left";
     }
   }
@@ -2516,18 +2520,18 @@
 
   function drawLadder(){
     var ctx=lSurf.ctx,w=lSurf.w,h=lSurf.h;
-    ctx.clearRect(0,0,w,h);ctx.fillStyle="#101c2d";ctx.fillRect(0,0,w,h);
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#12151c";ctx.fillRect(0,0,w,h);
     var maxSize=Math.max.apply(null,levels.map(function(lv){return lv.size;}));
     ctx.textBaseline="middle";ctx.font="16px 'IBM Plex Mono', monospace";
     levels.forEach(function(lv,i){
       var row=ladderRowY(i), center=row.y+row.h/2, selected=i===ladderPlayer.idx;
-      var bid=lv.side==="bid", color=bid?"#43d9ad":"#fa7785";
+      var bid=lv.side==="bid", color=bid?"#35c48c":"#e2506e";
       var depthW=lv.size/maxSize*96;
-      ctx.fillStyle=selected?"#263b54":i%2?"#122033":"#101c2d";ctx.fillRect(0,row.y,w,row.h);
+      ctx.fillStyle=selected?"#262b36":i%2?"#15181f":"#12151c";ctx.fillRect(0,row.y,w,row.h);
       ctx.fillStyle=color;ctx.globalAlpha=selected?.32:.16;
       ctx.fillRect(bid?121-depthW:239,row.y+2,depthW,row.h-4);ctx.globalAlpha=1;
       ctx.fillStyle=color;ctx.textAlign=bid?"right":"left";ctx.fillText(String(lv.size),bid?110:250,center);
-      ctx.fillStyle=selected?"#e6edf7":"#b4c4d7";ctx.textAlign="center";ctx.fillText(lv.price.toFixed(2),w/2,center);
+      ctx.fillStyle=selected?"#e8eaef":"#b8bdc8";ctx.textAlign="center";ctx.fillText(lv.price.toFixed(2),w/2,center);
       if(selected){
         ctx.strokeStyle="#f2bb66";ctx.lineWidth=1;ctx.strokeRect(.5,row.y+.5,w-1,row.h-1);
         ctx.fillStyle="#f2bb66";ctx.textAlign="left";ctx.font="600 11px 'IBM Plex Mono', monospace";
@@ -2535,8 +2539,8 @@
       }
     });
     var mid=(ladderRowY(BID_N-1).y+ladderRowY(BID_N).y+ladderRowY(BID_N).h)/2;
-    ctx.fillStyle="#0b1220";ctx.fillRect(0,mid-8,w,16);
-    ctx.fillStyle="#9aaec6";ctx.textAlign="center";ctx.font="10px 'IBM Plex Mono', monospace";
+    ctx.fillStyle="#0b0d12";ctx.fillRect(0,mid-8,w,16);
+    ctx.fillStyle="#8c93a3";ctx.textAlign="center";ctx.font="10px 'IBM Plex Mono', monospace";
     ctx.fillText("Entry "+basePrice.toFixed(2)+" · cross to flip",w/2,mid);
     ctx.textAlign="left";ctx.textBaseline="alphabetic";
   }
