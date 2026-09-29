@@ -10,11 +10,11 @@ the `plays/` demos. That flips the usual GitHub hygiene rule:
 - **Never open a public issue for internal milestone/gate work** (the M-series: M8, M9,
   M10...). Track that in the private "Matchstick Labs (internal)" org project instead —
   `gh project item-list 2 --owner matchstick-trading` (project #2, tracked in the private
-  internal project tracker). Add a draft item there, or link it to the relevant ticket in
-  the internal ticket system (tagged `project: matchstick-labs`) — no public issue needed.
+  internal project tracker). Add a draft item there, or link it to the relevant Markdown ticket in
+  the private internal tickets folder (tagged `project: matchstick-labs`) — no public issue needed.
 - **A real user's issue is real signal — treat it as such.** Acknowledge it, triage it, and
-  cross-reference a Forage ticket if one gets opened for the work, but never delete it and
-  never paste internal specifics (Forage ticket bodies, milestone/gate names, other users'
+  cross-reference an internal ticket if one gets opened for the work, but never delete it and
+  never paste internal specifics (internal ticket bodies, milestone/gate names, other users'
   info) into a public comment.
 - **If internal planning ends up in a public issue anyway**, migrate its substance to the
   private project and close the issue with an explanatory comment — don't leave it sitting
