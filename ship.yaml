@@ -1,0 +1,46 @@
+# ship.yaml: read by ~/.claude/skills/ship/verify.mjs
+site: https://labs.matchstick.trading
+# No sitemap.xml exists (it falls back to the index page), so pages are listed explicitly.
+# Add a new play here when one is added under plays/.
+sitemap: null
+pages:
+  - /
+  - /tape-and-ladder/
+  - /find-the-moment/
+  - /backtest-autopsy/
+  - /market-data-incident-lab/
+  - /decision-boundary-lab/
+  - /agent-intent-firewall/
+# Deploy facts (found 2026-10-01): plays/ is static HTML with no build step; hosted on
+# Cloudflare (the STATUS.md says Cloudflare hosts site + Jev worker). The Pages project
+# and deploy trigger are not documented in this repo: confirm with the owner before /ship deploys.
+build: []
+test:
+  - "node scripts/ui-smoke.mjs"
+deploy: null
+# No commit/build hash is exposed. To enable the stale-deploy check, have the deploy step
+# write plays/version.txt (git rev-parse HEAD) and uncomment:
+# version: {url: /version.txt}
+ignoreConsole: []
+metaExempt: []
+meta: [og:title, og:description, og:url, og:type, twitter:card]
+nav:
+  selector: "a[href]"
+  pages: ["/"]
+copy:
+  "/":
+    - "matchstick-labs"
+    - "Playful R&D and control-scheme experiments. Not the Matchstick Replay product."
+    - "Tape & Ladder"
+    - "Support is optional and does not buy uptime, access, priority, or a particular result."
+  "/tape-and-ladder/":
+    - "Read the market. Jump the risk. Keep your edge."
+    - "Leaderboard initials"
+  "/find-the-moment/": ["Find the Moment"]
+  "/backtest-autopsy/": ["Backtest Autopsy"]
+  "/market-data-incident-lab/": ["Market Data Incident Lab"]
+  "/decision-boundary-lab/": ["Decision Boundary Lab"]
+  "/agent-intent-firewall/": ["Agent Intent Firewall"]
+# No signup or feedback forms on the static pages. The Tape & Ladder leaderboard POSTs scores
+# to the leaderboard worker only at game end; it is deliberately not exercised here.
+flows: []
