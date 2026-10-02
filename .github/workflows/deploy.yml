@@ -1,7 +1,8 @@
 name: Deploy to Cloudflare Pages
 
 # labs.matchstick.trading is a direct-upload Pages project; this uploads plays/ on every push
-# to main. plays/ is the whole site, with no build step.
+# to main. plays/ is the whole site, with no build step. Actions that see the API token are
+# pinned to full commit SHAs.
 
 on:
   push:
@@ -18,10 +19,22 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: cloudflare/wrangler-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Skip if main has moved on
+        id: fresh
+        run: |
+          head=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "main is at $head, this run is $GITHUB_SHA; a newer run will deploy."
+            echo "current=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.fresh.outputs.current == 'true'
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
