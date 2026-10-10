@@ -12,51 +12,101 @@
 <meta property="og:site_name" content="Matchstick Labs">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="matchstick-labs — plays">
+<meta name="theme-color" content="#0b0d12">
 <meta name="twitter:description" content="Playful R&amp;D and control-scheme experiments. Not the Matchstick Replay product.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
+  /* Tokens mirror matchstick.trading (src/styles/replay-landing.css) so Labs
+     reads as part of the same brand. Accent marks brand and interaction only. */
+  :root {
+    color-scheme: dark;
+    --ink: #0b0d12;
+    --panel: #12151c;
+    --rule: #232833;
+    --rule-bright: #333a49;
+    --type: #e8eaef;       /* 16.15:1 on --ink */
+    --type-dim: #8c93a3;   /* 6.31:1 on --ink, 5.93:1 on --panel */
+    --type-faint: #7d8698; /* 5.31:1 on --ink */
+    --accent: #ff2a85;
+    --accent-light: #ff758f;
+    --accent-glow: rgba(255, 42, 133, 0.5);
+    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
   body {
     margin: 0;
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #0b0d10;
-    color: #e8e6e1;
-    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--ink);
+    color: var(--type);
+    font: 16px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
   }
   main { max-width: 560px; padding: 2rem; }
-  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-  p.sub { color: #9a9a9a; margin-top: 0; }
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.5625rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.25rem;
+  }
+  /* The site's wordmark mark: a graphite stem with a lit head. */
+  .mark {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    background: var(--rule-bright);
+  }
+  .mark::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -3px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px 2px var(--accent-glow);
+    transform: translateX(-50%);
+  }
+  p.sub { color: var(--type-dim); margin-top: 0; }
   ul { list-style: none; padding: 0; margin-top: 2rem; }
   li { margin-bottom: 0.75rem; }
   a.play {
     display: block;
     padding: 0.9rem 1.1rem;
-    border: 1px solid #2a2d33;
-    border-radius: 8px;
-    color: #e8e6e1;
+    border: 1px solid var(--rule-bright);
+    border-radius: 4px;
+    color: var(--type);
     text-decoration: none;
-    background: #14171c;
-    transition: border-color 0.15s ease;
+    background: var(--panel);
+    transition: border-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
   }
-  a.play:hover { border-color: #5b7cff; }
+  a.play:hover, a.system:hover { border-color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
   a.play .name { font-weight: 600; }
-  a.play .desc { color: #9a9a9a; font-size: 0.9rem; }
-  footer { margin-top: 2rem; font-size: 0.8rem; color: #6a6a6a; line-height: 1.7; }
-  footer a { color: #6a6a6a; }
-  footer .footer-founder { color: #9a9a9a; margin-bottom: 4px; }
+  a.play .desc { color: var(--type-dim); font-size: 0.9rem; }
+  footer { margin-top: 2rem; font-size: 0.8125rem; color: var(--type-faint); line-height: 1.7; }
+  footer a { color: var(--type-dim); }
+  footer a:hover { color: var(--type); }
+  footer .footer-founder { color: var(--type-dim); margin-bottom: 4px; }
   footer .footer-links a { margin: 0 3px; }
   footer details.footer-support-note { margin-top: 6px; }
-  footer details.footer-support-note summary { cursor: pointer; font-size: 0.75rem; color: #6a6a6a; }
-  footer details.footer-support-note summary:hover { color: #9a9a9a; }
-  footer details.footer-support-note p { max-width: 480px; margin: 6px 0 0; font-size: 0.75rem; line-height: 1.5;
-    color: #6a6a6a; }
+  footer details.footer-support-note summary { cursor: pointer; font-size: 0.8125rem; color: var(--type-faint); }
+  footer details.footer-support-note summary:hover { color: var(--type); }
+  footer details.footer-support-note p { max-width: 480px; margin: 6px 0 0; font-size: 0.8125rem; line-height: 1.5;
+    color: var(--type-faint); }
+  /* Sentence case, not tracked caps: matches the site's `.label`. */
   h2.systems-heading {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #6a6a6a;
+    font-size: 0.8125rem;
+    color: var(--type-faint);
     font-weight: 600;
     margin: 2rem 0 0.75rem;
   }
@@ -65,21 +115,21 @@
   a.system {
     display: block;
     padding: 0.65rem 1.1rem;
-    border: 1px solid #2a2d33;
-    border-radius: 8px;
-    color: #e8e6e1;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    color: var(--type);
     text-decoration: none;
     background: transparent;
-    transition: border-color 0.15s ease;
+    transition: border-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
   }
-  a.system:hover { border-color: #5b7cff; }
   a.system .name { font-weight: 600; font-size: 0.88rem; }
-  a.system .desc { color: #9a9a9a; font-size: 0.8rem; }
+  a.system .desc { color: var(--type-dim); font-size: 0.8125rem; }
+  @media (prefers-reduced-motion: reduce) { a.play, a.system { transition: none; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>matchstick-labs</h1>
+  <h1><span class="mark" aria-hidden="true"></span>matchstick-labs</h1>
   <p class="sub">Playful R&amp;D and control-scheme experiments. Not the Matchstick Replay product.</p>
   <ul>
     <li>
