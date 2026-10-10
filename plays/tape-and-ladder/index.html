@@ -2530,7 +2530,8 @@
       ctx.fillStyle=selected?"#262b36":i%2?"#15181f":"#12151c";ctx.fillRect(0,row.y,w,row.h);
       ctx.fillStyle=color;ctx.globalAlpha=selected?.32:.16;
       ctx.fillRect(bid?121-depthW:239,row.y+2,depthW,row.h-4);ctx.globalAlpha=1;
-      ctx.fillStyle=color;ctx.textAlign=bid?"right":"left";ctx.fillText(String(lv.size),bid?110:250,center);
+      /* The ask red is ~3.8:1 on the selected row; a lighter tint keeps the size at 4.5:1 or better. */
+      ctx.fillStyle=(selected&&!bid)?"#ff9db0":color;ctx.textAlign=bid?"right":"left";ctx.fillText(String(lv.size),bid?110:250,center);
       ctx.fillStyle=selected?"#e8eaef":"#b8bdc8";ctx.textAlign="center";ctx.fillText(lv.price.toFixed(2),w/2,center);
       if(selected){
         ctx.strokeStyle="#f2bb66";ctx.lineWidth=1;ctx.strokeRect(.5,row.y+.5,w-1,row.h-1);
