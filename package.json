@@ -10,7 +10,6 @@
     "type": "git",
     "url": "git+https://github.com/matchstick-trading/matchstick-labs.git"
   },
-  "license": "ISC",
   "devDependencies": {
     "playwright": "^1.63.0"
   }
