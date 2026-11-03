@@ -17,22 +17,59 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Tokens mirror matchstick.trading (src/styles/replay-landing.css) so Labs
-     reads as part of the same brand. Accent marks brand and interaction only. */
+  /* Copied from matchstick-trading wiki/design/tokens.css (DESIGN.md v0.1.0). Do not hand-edit; re-copy. */
   :root {
-    color-scheme: dark;
     --ink: #0b0d12;
     --panel: #12151c;
+    --panel-deep: #090b0f;
     --rule: #232833;
     --rule-bright: #333a49;
-    --type: #e8eaef;       /* 16.15:1 on --ink */
-    --type-dim: #8c93a3;   /* 6.31:1 on --ink, 5.93:1 on --panel */
-    --type-faint: #7d8698; /* 5.31:1 on --ink */
+    --type: #e8eaef;
+    --type-dim: #8c93a3;
+    --type-faint: #7d8698;
     --accent: #ff2a85;
+    --accent-soft: #ff5c8d;
     --accent-light: #ff758f;
-    --accent-glow: rgba(255, 42, 133, 0.5);
-    --sans: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --accent-press: #ff4d97;
+    --on-accent: #1a0010;
+    --focus: #ff2a85;
+    --bid: #4aa3ff;
+    --ask: #ff9f43;
+    --state-done: #35c48c;
+    --state-open: #9ec9ff;
+    --state-waiting: #ffc247;
+    --state-error: #ff6b6b;
+    --synthetic: #b48cff;
+    --sans: "Archivo Variable", "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --t-13: 0.8125rem;
+    --t-16: 1rem;
+    --t-20: 1.25rem;
+    --t-25: 1.5625rem;
+    --t-31: 1.9375rem;
+    --t-39: 2.4375rem;
+    --t-49: 3.0625rem;
+    --t-61: 3.8125rem;
+    --t-76: 4.75rem;
+    --s1: 4px;
+    --s2: 8px;
+    --s3: 12px;
+    --s4: 16px;
+    --s5: 24px;
+    --s6: 32px;
+    --s7: 48px;
+    --s8: 64px;
+    --s9: 96px;
+    --s10: 128px;
+    --r-control: 6px;
+    --r-panel: 8px;
+    --r-pill: 999px;
+    --touch-target: 44px;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --press: 140ms var(--ease-out);
+    color-scheme: dark;
   }
+  :root { --accent-glow: color-mix(in srgb, var(--accent) 50%, transparent); }
   body {
     margin: 0;
     min-height: 100vh;
@@ -83,23 +120,27 @@
     display: block;
     padding: 0.9rem 1.1rem;
     border: 1px solid var(--rule-bright);
-    border-radius: 4px;
+    border-radius: var(--r-panel);
     color: var(--type);
     text-decoration: none;
     background: var(--panel);
-    transition: border-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: border-color var(--press);
   }
+  a.play, a.system { min-height: var(--touch-target); }
   a.play:hover, a.system:hover { border-color: var(--accent); }
+  a.play:active, a.system:active { border-color: var(--accent-press); }
   a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
   a.play .name { font-weight: 600; }
   a.play .desc { color: var(--type-dim); font-size: 0.9rem; }
   footer { margin-top: 2rem; font-size: 0.8125rem; color: var(--type-faint); line-height: 1.7; }
-  footer a { color: var(--type-dim); }
+  footer a { color: var(--type-dim); display: inline-flex; align-items: center; min-height: var(--touch-target); min-width: var(--touch-target); }
+  footer .footer-links { display: flex; flex-wrap: wrap; column-gap: 16px; }
+  footer .footer-links a { margin: 0; }
+  .synthetic-note { margin: 0.75rem 0 0; font-size: var(--t-13); color: var(--synthetic); }
   footer a:hover { color: var(--type); }
   footer .footer-founder { color: var(--type-dim); margin-bottom: 4px; }
-  footer .footer-links a { margin: 0 3px; }
-  footer details.footer-support-note { margin-top: 6px; }
-  footer details.footer-support-note summary { cursor: pointer; font-size: 0.8125rem; color: var(--type-faint); }
+    footer details.footer-support-note { margin-top: 6px; }
+  footer details.footer-support-note summary { display: flex; align-items: center; min-height: var(--touch-target); cursor: pointer; font-size: 0.8125rem; color: var(--type-faint); }
   footer details.footer-support-note summary:hover { color: var(--type); }
   footer details.footer-support-note p { max-width: 480px; margin: 6px 0 0; font-size: 0.8125rem; line-height: 1.5;
     color: var(--type-faint); }
@@ -116,11 +157,11 @@
     display: block;
     padding: 0.65rem 1.1rem;
     border: 1px solid var(--rule);
-    border-radius: 4px;
+    border-radius: var(--r-panel);
     color: var(--type);
     text-decoration: none;
     background: transparent;
-    transition: border-color 140ms cubic-bezier(0.23, 1, 0.32, 1);
+    transition: border-color var(--press);
   }
   a.system .name { font-weight: 600; font-size: 0.88rem; }
   a.system .desc { color: var(--type-dim); font-size: 0.8125rem; }
@@ -131,6 +172,7 @@
 <main>
   <h1><span class="mark" aria-hidden="true"></span>matchstick-labs</h1>
   <p class="sub">Playful R&amp;D and control-scheme experiments. Not the Matchstick Replay product.</p>
+  <p class="synthetic-note">Plays use synthetic data and paper trades only.</p>
   <ul>
     <li>
       <a class="play" href="./tape-and-ladder/">
@@ -191,8 +233,8 @@
     </div>
     <div class="footer-links">
       <a href="mailto:hello@matchstick.trading">Contact</a>
-      &middot; <a href="https://buymeacoffee.com/watthem">Support these experiments</a>
-      &middot; <a href="https://github.com/matchstick-trading/matchstick-labs/blob/main/STATUS.md">Service status</a>
+      <a href="https://buymeacoffee.com/watthem">Support these experiments</a>
+      <a href="https://github.com/matchstick-trading/matchstick-labs/blob/main/STATUS.md">Service status</a>
     </div>
     <details class="footer-support-note">
       <summary>What does support mean?</summary>
