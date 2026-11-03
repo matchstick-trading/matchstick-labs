@@ -278,7 +278,7 @@
     <div class="kbrow"><kbd>W / S</kbd><span>Move up / down the risk ladder. Crossing entry flips your side.</span></div>
     <div class="kbrow"><kbd>P / Esc</kbd><span>Pause or resume the run.</span></div>
     <div class="kbrow"><kbd>R</kbd><span>Start a fresh course.</span></div>
-    <div class="lesson"><b>Market context and arcade risk use different marks.</b><br>Blue candles close higher; orange candles close lower, all on the printed synthetic-price scale. A small amber marker connects a risk candle to its ground-level outline; only that outlined gate collides. Small candles can still change P&amp;L when you pass them, even in the air.</div>
+    <div class="lesson"><b>Market context and arcade risk use different marks.</b><br>Hollow candles close higher; filled candles close lower, all on the printed synthetic-price scale. A small amber marker connects a risk candle to its ground-level outline; only that outlined gate collides. Small candles can still change P&amp;L when you pass them, even in the air.</div>
     <p><b>Watch what comes next.</b> Hold through a movement cluster or a news gap. Stay low under resistance; land on support from above or jump it. Later, fans and moving-average channels add new timing challenges. The cue below the chart calls them out.</p>
     <p><b>Your score is your highest P&amp;L.</b> Every gain and loss is multiplied by leverage. A loss from your peak uses up margin; exceed the allowance and the run ends. This is an arcade scoring rule.</p>
     <button class="close primary" id="helpClose" type="button">Got it</button>
@@ -2289,7 +2289,7 @@
       for (var i=startI;i<=endI;i++){
         var b = barAt(i); if (!b) continue;
         var candle = candleGameplayGeometry(b, i);
-        var sx = candle.worldX-cam, col = b.bull ? C.bid : C.ask;
+        var sx = candle.worldX-cam, col = C.dim;
         // One fixed-scale market candle. Its price geometry is informational in
         // Gate C; the separate amber gate below is the exact arcade collision.
         ctx.globalAlpha = b.resolved ? .48 : 1;
@@ -2335,7 +2335,7 @@
       ctx.textAlign="left";
       var current=barAt(terrainIndexAt(player.x));
       if (current){
-        var currentY=priceToGameplayY(current.close), currentColor=current.bull?C.bid:C.ask;
+        var currentY=priceToGameplayY(current.close), currentColor=C.dim;
         ctx.strokeStyle=currentColor;ctx.globalAlpha=.45;ctx.setLineDash([4,4]);
         ctx.beginPath();ctx.moveTo(0,currentY);ctx.lineTo(w-55,currentY);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
         ctx.fillStyle=currentColor;ctx.fillRect(w-55,currentY-9,55,18);
@@ -2429,7 +2429,7 @@
     setText("sessionStatus",phase==="setup"?"Ready to open":phase==="gameover"?"Session closed":paused||helpOpen?"Paused":"Tape live");
     document.getElementById("pauseBtn").disabled=phase!=="running";
     if (!paused) setText("pauseBtn","Pause · P");
-    var favorable=direction==="LONG"?"Blue":"Orange";
+    var favorable=direction==="LONG"?"Hollow":"Filled";
     var cue='<span class="legendMark">⌜⌝</span> <strong>Jump amber gates.</strong> Price candles show synthetic market context; '+favorable+' favors your '+direction.toLowerCase()+'.';
     var loop=document.getElementById("loopCue");if(loop.dataset.direction!==direction){loop.innerHTML=cue;loop.dataset.direction=direction;}
     setText("nextCue",nextActionCue());
