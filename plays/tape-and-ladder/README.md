@@ -7,7 +7,7 @@ Click **Start run** or press **Space**. Start at 1× while learning the rhythm. 
 hidden and stationary until you start. A new run resets the course and difficulty.
 
 - **Price playfield:** synthetic OHLC candles, support/resistance, price scale, and current-price
-  guide share one fixed price-to-height mapping. Hollow green candles close higher; filled red
+  guide share one fixed price-to-height mapping. Hollow grey candles close higher; filled grey
   candles close lower. Candle bodies and wicks are market context, not collision shapes.
 - **Jump gates:** a small amber marker and dashed connector associate a risk candle with its
   ground-level gate; only the closed amber outline is collision geometry. Jump that gate. Small
