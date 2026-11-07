@@ -33,7 +33,7 @@ async function main() {
   }
 
   const server = serveDir(PLAY_DIR);
-  await new Promise((res) => server.listen(0, res));
+  await new Promise((res) => server.listen(0, "127.0.0.1", res));
   const port = server.address().port;
   console.log(`Serving ${PLAY_DIR} at http://localhost:${port}`);
 
