@@ -6,14 +6,28 @@
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
 export function serveDir(dir) {
+  const root = resolve(dir);
   return createServer(async (req, res) => {
-    const path = req.url.split("?")[0];
-    const filePath = path === "/" ? join(dir, "index.html") : join(dir, path);
+    let path;
+    try {
+      path = decodeURIComponent(req.url.split("?")[0]);
+    } catch {
+      res.writeHead(400);
+      res.end("bad request");
+      return;
+    }
+    const filePath = path === "/" ? join(root, "index.html") : resolve(root, `.${path}`);
+    // Only files inside the served directory: a path that climbs out of it gets a 404.
+    if (filePath !== root && !filePath.startsWith(root + sep)) {
+      res.writeHead(404);
+      res.end("not found");
+      return;
+    }
     try {
       const data = await readFile(filePath);
       res.writeHead(200, { "Content-Type": MIME[extname(filePath)] || "application/octet-stream" });

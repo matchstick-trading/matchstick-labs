@@ -24,6 +24,10 @@
 
 const DEFAULT_PLAY = "tape-and-ladder";
 
+// The plays that have a leaderboard. Any other play name is refused, so stored rows stay bounded:
+// at most 200 per listed play (the prune in handlePostScore). Add a play here when it gets a board.
+const PLAYS = new Set([DEFAULT_PLAY]);
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -57,11 +61,13 @@ export default {
 function getPlay(source) {
   const raw = typeof source.get === "function" ? source.get("play") : source.play;
   const cleaned = (raw || "").toString().trim().slice(0, 60);
-  return cleaned || DEFAULT_PLAY;
+  const play = cleaned || DEFAULT_PLAY;
+  return PLAYS.has(play) ? play : null;
 }
 
 async function handleGetScores(env, url) {
   const play = getPlay(url.searchParams);
+  if (!play) return json({ ok: false, error: "Unknown play" }, 400);
   const defaultLimit = toInt(env.DEFAULT_LIMIT, 10);
   const limit = clamp(toInt(url.searchParams.get("limit"), defaultLimit), 1, 100);
 
@@ -82,6 +88,7 @@ async function handleGetScores(env, url) {
 
 async function handleQualify(env, url) {
   const play = getPlay(url.searchParams);
+  if (!play) return json({ ok: false, error: "Unknown play" }, 400);
   const score = toInt(url.searchParams.get("score"), -1);
   if (!Number.isFinite(score) || score < 0) {
     return json({ ok: false, error: "Missing/invalid score" }, 400);
@@ -119,6 +126,7 @@ async function handlePostScore(env, request) {
   }
 
   const play = getPlay(body);
+  if (!play) return json({ ok: false, error: "Unknown play" }, 400);
   const maxInitialsLen = toInt(env.MAX_INITIALS_LEN, 4);
   const maxScore = toInt(env.MAX_SCORE, 100000000);
 
